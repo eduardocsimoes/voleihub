@@ -2,12 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+
 * {
   font-family: 'Inter', sans-serif !important;
 }
-
-/* FORCE FUNDO LARANJA CLARO FIXO */
-html, body {
-  background: linear-gradient(to bottom, #ffedd5, #fff7ed, white) !important;
-}
-

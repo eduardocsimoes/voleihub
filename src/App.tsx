@@ -1,304 +1,160 @@
-import { useState } from 'react';
-import { Menu, X, CheckCircle, Users, BarChart3, Calendar, ChevronDown, Star } from 'lucide-react';
+import { useState } from "react";
+import AuthModal from "./components/AuthModal";
 
-function App() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
-
-  const features = [
-    {
-      icon: <Users className="w-8 h-8" />,
-      title: "Gestão de Atletas",
-      description: "Cadastro completo com histórico, estatísticas e evolução de cada jogador"
-    },
-    {
-      icon: <BarChart3 className="w-8 h-8" />,
-      title: "Análise de Performance",
-      description: "Métricas detalhadas e relatórios visuais para acompanhar o desempenho"
-    },
-    {
-      icon: <Calendar className="w-8 h-8" />,
-      title: "Controle de Treinos",
-      description: "Planejamento e registro de treinos com presença e atividades realizadas"
-    }
-  ];
-
-  const steps = [
-    { number: "01", title: "Cadastre sua equipe", description: "Crie sua conta e adicione seus atletas em minutos" },
-    { number: "02", title: "Registre as atividades", description: "Acompanhe treinos, jogos e evolução diária" },
-    { number: "03", title: "Analise os resultados", description: "Visualize dados e tome decisões baseadas em métricas reais" }
-  ];
-
-  const plans = [
-    {
-      name: "Starter",
-      price: "Grátis",
-      description: "Ideal para pequenas equipes",
-      features: ["Até 15 atletas", "Funcionalidades básicas", "Suporte por email"],
-      cta: "Começar grátis",
-      highlighted: false
-    },
-    {
-      name: "Pro",
-      price: "R$ 49",
-      period: "/mês",
-      description: "Para equipes profissionais",
-      features: ["Atletas ilimitados", "Todas as funcionalidades", "Relatórios avançados", "Suporte prioritário"],
-      cta: "Iniciar teste grátis",
-      highlighted: true
-    },
-    {
-      name: "Enterprise",
-      price: "Customizado",
-      description: "Para clubes e federações",
-      features: ["Múltiplas equipes", "API personalizada", "Treinamento dedicado", "Gerente de conta"],
-      cta: "Falar com vendas",
-      highlighted: false
-    }
-  ];
-
-  const testimonials = [
-    {
-      name: "Carlos Silva",
-      role: "Técnico - Vôlei Campeões SC",
-      content: "O VôleiHub transformou a forma como gerencio minha equipe. Agora tenho dados concretos para cada decisão.",
-      rating: 5
-    },
-    {
-      name: "Marina Oliveira",
-      role: "Coordenadora - Academia Vôlei Pro",
-      content: "Plataforma intuitiva e completa. Economizamos horas de trabalho toda semana.",
-      rating: 5
-    }
-  ];
-
-  const faqs = [
-    {
-      question: "Como funciona o período de teste?",
-      answer: "Você pode testar o plano Pro gratuitamente por 14 dias, sem necessidade de cartão de crédito."
-    },
-    {
-      question: "Posso cancelar a qualquer momento?",
-      answer: "Sim! Você pode cancelar sua assinatura quando quiser, sem multas ou taxas adicionais."
-    },
-    {
-      question: "Os dados são seguros?",
-      answer: "Absolutamente. Usamos criptografia de ponta e seguimos as melhores práticas de segurança da indústria."
-    },
-    {
-      question: "Há suporte em português?",
-      answer: "Sim, nosso suporte é 100% em português e está disponível para ajudar você."
-    }
-  ];
+export default function App() {
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white text-gray-900 font-sans">
       {/* Navbar */}
-      <nav className="fixed top-0 w-full bg-white/95 backdrop-blur-sm border-b border-gray-100 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <span className="text-2xl font-bold text-orange-600">VôleiHub</span>
-            </div>
-            
-            <div className="hidden md:flex items-center space-x-8">
-              <a href="#funcionalidades" className="text-gray-700 hover:text-orange-600 transition">Funcionalidades</a>
-              <a href="#como-funciona" className="text-gray-700 hover:text-orange-600 transition">Como Funciona</a>
-              <a href="#planos" className="text-gray-700 hover:text-orange-600 transition">Planos</a>
-              <a href="#depoimentos" className="text-gray-700 hover:text-orange-600 transition">Depoimentos</a>
-              <button className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition">
-                Começar Agora
-              </button>
-            </div>
+      <header className="fixed top-0 w-full bg-white/90 backdrop-blur shadow-sm z-50">
+        <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
+          <h1 className="text-2xl font-black text-orange-600 tracking-tight">VôleiHub</h1>
+          <nav className="hidden md:flex space-x-6 font-medium">
+            <a href="#sobre" className="hover:text-orange-600">Sobre</a>
+            <a href="#recursos" className="hover:text-orange-600">Recursos</a>
+            <a href="#ecossistema" className="hover:text-orange-600">Ecossistema</a>
+            <a href="#planos" className="hover:text-orange-600">Planos</a>
+          </nav>
 
-            <button 
-              className="md:hidden"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              {mobileMenuOpen ? <X /> : <Menu />}
-            </button>
-          </div>
+          <button
+            onClick={() => {
+              setAuthMode("login");
+              setAuthOpen(true);
+            }}
+            className="border border-orange-600 text-orange-600 px-6 py-2 rounded-xl font-semibold hover:bg-orange-50"
+          >
+            Entrar
+          </button>
+
+          <button
+            onClick={() => {
+              setAuthMode("register");
+              setAuthOpen(true);
+            }}
+            className="bg-orange-600 text-white px-6 py-2 rounded-xl font-semibold hover:bg-orange-500"
+          >
+            Criar conta
+          </button>
+          
         </div>
+      </header>
 
-        {mobileMenuOpen && (
-          <div className="md:hidden bg-white border-t border-gray-100">
-            <div className="px-4 py-4 space-y-3">
-              <a href="#funcionalidades" className="block text-gray-700 hover:text-orange-600">Funcionalidades</a>
-              <a href="#como-funciona" className="block text-gray-700 hover:text-orange-600">Como Funciona</a>
-              <a href="#planos" className="block text-gray-700 hover:text-orange-600">Planos</a>
-              <a href="#depoimentos" className="block text-gray-700 hover:text-orange-600">Depoimentos</a>
-              <button className="w-full px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700">
-                Começar Agora
-              </button>
-            </div>
-          </div>
-        )}
-      </nav>
-
-      {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto text-center">
-          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-            Gestão Completa para
-            <span className="text-orange-600"> Equipes de Vôlei</span>
-          </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-            Transforme dados em resultados. Gerencie atletas, treinos e performance em uma única plataforma profissional.
+      {/* Hero */}
+      <section className="pt-36 pb-24 px-6 bg-gradient-to-br from-orange-50 to-white text-center">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-5xl md:text-6xl font-black leading-tight mb-6">
+            A nova geração da
+            <span className="text-orange-600 block">liberdade no esporte</span>
+          </h2>
+          <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-10">
+            Uma plataforma criada para dar autonomia real a atletas, clubes, treinadores, agentes e patrocinadores.
           </p>
+
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="px-8 py-4 bg-orange-600 text-white rounded-lg text-lg font-semibold hover:bg-orange-700 transition shadow-lg hover:shadow-xl">
-              Começar Gratuitamente
+            <button className="bg-orange-600 text-white px-10 py-4 rounded-2xl text-lg font-semibold hover:bg-orange-500">
+              Criar conta gratuita
             </button>
-            <button className="px-8 py-4 bg-white text-gray-900 rounded-lg text-lg font-semibold border-2 border-gray-200 hover:border-orange-600 transition">
-              Ver Demonstração
+            <button className="border-2 border-orange-600 text-orange-600 px-10 py-4 rounded-2xl text-lg font-semibold hover:bg-orange-50">
+              Ver demonstração
             </button>
           </div>
-          <p className="text-sm text-gray-500 mt-4">Sem cartão de crédito • Teste grátis por 14 dias</p>
         </div>
       </section>
 
-      {/* Features */}
-      <section id="funcionalidades" className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Funcionalidades Poderosas</h2>
-            <p className="text-xl text-gray-600">Tudo que você precisa para gerenciar sua equipe com excelência</p>
+      {/* Sobre */}
+      <section id="sobre" className="py-24 px-6">
+        <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16 items-center">
+          <div>
+            <h3 className="text-4xl font-bold mb-6">
+              Mais que uma plataforma. Um ecossistema.
+            </h3>
+            <p className="text-lg text-gray-600 leading-relaxed">
+              O VôleiHub conecta atletas a oportunidades reais: clubes, patrocinadores,
+              treinadores, agentes, cursos e produtos — tudo em um único ambiente inteligente.
+            </p>
           </div>
-          
-          <div className="grid md:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
-              <div key={index} className="bg-white p-8 rounded-xl shadow-sm hover:shadow-md transition">
-                <div className="text-orange-600 mb-4">{feature.icon}</div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">{feature.title}</h3>
-                <p className="text-gray-600">{feature.description}</p>
+
+          <div className="bg-orange-50 p-10 rounded-3xl shadow-lg">
+            <ul className="space-y-4 text-lg font-medium">
+              <li>⚡ Autonomia profissional</li>
+              <li>⚡ Vitrine pública para carreira</li>
+              <li>⚡ Conexões diretas e oportunidades reais</li>
+              <li>⚡ Plataforma de crescimento esportivo</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      {/* Recursos */}
+      <section id="recursos" className="py-24 bg-gray-50 px-6">
+        <div className="max-w-7xl mx-auto text-center">
+          <h3 className="text-4xl font-extrabold mb-16">Recursos principais</h3>
+
+          <div className="grid md:grid-cols-3 gap-10">
+            {[
+              { title: "Perfil Pro", desc: "Currículo esportivo inteligente" },
+              { title: "Vitrine Pública", desc: "Seja encontrado por clubes" },
+              { title: "Match Inteligente", desc: "Algoritmo que conecta oportunidades" },
+              { title: "Marketplace", desc: "Equipamentos personalizados" },
+              { title: "Educação", desc: "Cursos e mentorias" },
+              { title: "Gestão de Carreira", desc: "Controle total da trajetória" }
+            ].map((item, index) => (
+              <div key={index} className="bg-white p-10 rounded-3xl shadow-lg hover:shadow-2xl transition">
+                <h4 className="text-2xl font-bold mb-4 text-orange-600">{item.title}</h4>
+                <p className="text-gray-600">{item.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* How It Works */}
-      <section id="como-funciona" className="py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Como Funciona</h2>
-            <p className="text-xl text-gray-600">Simples, rápido e eficiente</p>
-          </div>
-          
-          <div className="grid md:grid-cols-3 gap-12">
-            {steps.map((step, index) => (
-              <div key={index} className="text-center">
-                <div className="w-16 h-16 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
-                  {step.number}
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">{step.title}</h3>
-                <p className="text-gray-600">{step.description}</p>
+      {/* Ecossistema */}
+      <section id="ecossistema" className="py-24 px-6">
+        <div className="max-w-6xl mx-auto text-center">
+          <h3 className="text-4xl font-extrabold mb-10">
+            Um ecossistema completo
+          </h3>
+
+          <p className="text-lg text-gray-600 max-w-3xl mx-auto mb-16">
+            Cada perfil dentro do VôleiHub tem autonomia para crescer, monetizar e conectar.
+          </p>
+
+          <div className="grid md:grid-cols-5 gap-6 text-sm font-semibold">
+            {[
+              "Atletas",
+              "Clubes",
+              "Treinadores",
+              "Agentes",
+              "Patrocinadores"
+            ].map((role, i) => (
+              <div key={i} className="bg-orange-600 text-white py-6 rounded-xl shadow-lg">
+                {role}
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="planos" className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Planos e Preços</h2>
-            <p className="text-xl text-gray-600">Escolha o plano ideal para sua equipe</p>
-          </div>
-          
-          <div className="grid md:grid-cols-3 gap-8">
-            {plans.map((plan, index) => (
-              <div 
-                key={index} 
-                className={`bg-white rounded-xl p-8 ${
-                  plan.highlighted 
-                    ? 'ring-2 ring-orange-600 shadow-xl scale-105' 
-                    : 'shadow-sm'
-                }`}
-              >
-                {plan.highlighted && (
-                  <div className="text-orange-600 text-sm font-bold mb-4">MAIS POPULAR</div>
-                )}
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
-                <p className="text-gray-600 mb-4">{plan.description}</p>
-                <div className="mb-6">
-                  <span className="text-4xl font-bold text-gray-900">{plan.price}</span>
-                  {plan.period && <span className="text-gray-600">{plan.period}</span>}
-                </div>
-                <button className={`w-full py-3 rounded-lg font-semibold transition ${
-                  plan.highlighted
-                    ? 'bg-orange-600 text-white hover:bg-orange-700'
-                    : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-                }`}>
-                  {plan.cta}
+      {/* Planos */}
+      <section id="planos" className="py-24 bg-gray-50 px-6">
+        <div className="max-w-6xl mx-auto text-center">
+          <h3 className="text-4xl font-extrabold mb-16">Planos</h3>
+
+          <div className="grid md:grid-cols-3 gap-10">
+            {[
+              { name: "Free", price: "R$0", desc: "Ideal para iniciar" },
+              { name: "Pro", price: "R$49", desc: "Para atletas competitivos" },
+              { name: "Elite", price: "R$199", desc: "Para alto rendimento" }
+            ].map((plan, index) => (
+              <div key={index} className="bg-white p-12 rounded-3xl shadow-lg hover:scale-105 transition">
+                <h4 className="text-2xl font-bold mb-4">{plan.name}</h4>
+                <div className="text-4xl font-black text-orange-600 mb-4">{plan.price}</div>
+                <p className="text-gray-600 mb-6">{plan.desc}</p>
+                <button className="bg-orange-600 text-white px-8 py-3 rounded-2xl font-semibold hover:bg-orange-500">
+                  Escolher plano
                 </button>
-                <ul className="mt-6 space-y-3">
-                  {plan.features.map((feature, idx) => (
-                    <li key={idx} className="flex items-center text-gray-600">
-                      <CheckCircle className="w-5 h-5 text-orange-600 mr-2 flex-shrink-0" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section id="depoimentos" className="py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">O Que Dizem Nossos Clientes</h2>
-            <p className="text-xl text-gray-600">Técnicos e gestores que confiam no VôleiHub</p>
-          </div>
-          
-          <div className="grid md:grid-cols-2 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <div key={index} className="bg-gray-50 p-8 rounded-xl">
-                <div className="flex mb-4">
-                  {[...Array(testimonial.rating)].map((_, i) => (
-                    <Star key={i} className="w-5 h-5 text-orange-600 fill-current" />
-                  ))}
-                </div>
-                <p className="text-gray-700 mb-4 text-lg">"{testimonial.content}"</p>
-                <div>
-                  <div className="font-bold text-gray-900">{testimonial.name}</div>
-                  <div className="text-gray-600 text-sm">{testimonial.role}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Perguntas Frequentes</h2>
-            <p className="text-xl text-gray-600">Tire suas dúvidas sobre o VôleiHub</p>
-          </div>
-          
-          <div className="space-y-4">
-            {faqs.map((faq, index) => (
-              <div key={index} className="bg-white rounded-lg shadow-sm overflow-hidden">
-                <button
-                  className="w-full px-6 py-4 text-left flex justify-between items-center hover:bg-gray-50 transition"
-                  onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                >
-                  <span className="font-semibold text-gray-900">{faq.question}</span>
-                  <ChevronDown className={`w-5 h-5 text-gray-600 transition-transform ${
-                    openFaq === index ? 'transform rotate-180' : ''
-                  }`} />
-                </button>
-                {openFaq === index && (
-                  <div className="px-6 pb-4 text-gray-600">
-                    {faq.answer}
-                  </div>
-                )}
               </div>
             ))}
           </div>
@@ -306,44 +162,9 @@ function App() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <h3 className="text-2xl font-bold text-orange-600 mb-4">VôleiHub</h3>
-              <p className="text-gray-400">Gestão profissional para equipes de vôlei</p>
-            </div>
-            <div>
-              <h4 className="font-bold mb-4">Produto</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-orange-600 transition">Funcionalidades</a></li>
-                <li><a href="#" className="hover:text-orange-600 transition">Planos</a></li>
-                <li><a href="#" className="hover:text-orange-600 transition">Demonstração</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-bold mb-4">Empresa</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-orange-600 transition">Sobre</a></li>
-                <li><a href="#" className="hover:text-orange-600 transition">Blog</a></li>
-                <li><a href="#" className="hover:text-orange-600 transition">Contato</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-bold mb-4">Legal</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-orange-600 transition">Privacidade</a></li>
-                <li><a href="#" className="hover:text-orange-600 transition">Termos</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-gray-800 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 VôleiHub. Todos os direitos reservados.</p>
-          </div>
-        </div>
+      <footer className="py-12 text-center text-gray-500 text-sm">
+        © 2025 VôleiHub — Autonomia começa aqui.
       </footer>
     </div>
   );
 }
-
-export default App;
