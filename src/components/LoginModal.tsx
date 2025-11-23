@@ -1,44 +1,30 @@
-interface LoginModalProps {
+interface Props {
     isOpen: boolean;
     onClose: () => void;
   }
   
-  const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
+  export default function LoginModal({ isOpen, onClose }: Props) {
     if (!isOpen) return null;
   
     return (
-      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-        <div className="bg-white w-full max-w-md rounded-2xl shadow-lg p-6 relative">
-          <button
-            onClick={onClose}
-            className="absolute top-3 right-3 text-gray-400 hover:text-black"
-          >
+      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+        <div className="bg-white rounded-2xl p-8 w-full max-w-md relative text-black">
+          <button onClick={onClose} className="absolute top-3 right-3 text-gray-500">
             ✕
           </button>
   
-          <h2 className="text-2xl font-bold mb-4 text-center">Entrar</h2>
+          <h2 className="text-2xl font-bold mb-6 text-center">
+            Entrar
+          </h2>
   
-          <form className="space-y-4">
-            <input
-              type="email"
-              placeholder="Email"
-              className="w-full p-3 border rounded-lg"
-            />
+          <input className="w-full p-3 border mb-3 rounded-lg" placeholder="Email" />
+          <input className="w-full p-3 border mb-5 rounded-lg" placeholder="Senha" type="password" />
   
-            <input
-              type="password"
-              placeholder="Senha"
-              className="w-full p-3 border rounded-lg"
-            />
-  
-            <button className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition">
-              Entrar
-            </button>
-          </form>
+          <button className="w-full bg-sky-500 text-black font-bold py-3 rounded-lg">
+            Entrar
+          </button>
         </div>
       </div>
     );
-  };
-  
-  export default LoginModal;
+  }
   
