@@ -1,8 +1,17 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-
+/* Reset básico para o Tailwind CDN funcionar corretamente */
 * {
-  font-family: 'Inter', sans-serif !important;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+#root {
+  /* SEM limitações de largura ou padding */
+  width: 100%;
+  min-height: 100vh;
 }
