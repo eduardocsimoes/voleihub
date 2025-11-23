@@ -1,0 +1,19 @@
+import { initializeApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD1qsxYzwNwo5iz7IkWkhpJv-QxmbwSibk",
+  authDomain: "volei-hub-f6a39.firebaseapp.com",
+  projectId: "volei-hub-f6a39",
+  storageBucket: "volei-hub-f6a39.firebasestorage.app",
+  messagingSenderId: "844364057290",
+  appId: "1:844364057290:web:eb8b93159afc2582cd4233",
+  measurementId: "G-YS3L6PEWCV"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+// Initialize Auth
+export const auth = getAuth(app);
+export const googleProvider = new GoogleAuthProvider();
