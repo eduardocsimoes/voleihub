@@ -12,8 +12,13 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+export const app = initializeApp(firebaseConfig);
 
 // Initialize Auth
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+
+// Configurar provider do Google para pedir nome e escolher conta
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
