@@ -1,3 +1,4 @@
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { Menu, X, Users, Target, TrendingUp, BookOpen, ShoppingBag, Award, Briefcase, Building2, GraduationCap, Trophy, Sparkles, ArrowRight, CheckCircle, ChevronDown } from 'lucide-react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
@@ -5,6 +6,7 @@ import { auth } from './firebase/config';
 import { logout } from './firebase/auth';
 import LoginModal from './components/LoginModal';
 import RegisterModal from './components/RegisterModal';
+import OnboardingRouter from './components/OnboardingRouter';
 
 // Declaração para suportar <style jsx>
 declare module 'react' {
@@ -610,6 +612,9 @@ export default function VoleihubEcosystem() {
           setShowLoginModal(true);
         }}
       />
+
+      {/* Onboarding Router - Detecta e mostra onboarding correto */}
+      <OnboardingRouter />
 
       <style jsx>{`
         @keyframes fade-in-up {
