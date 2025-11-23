@@ -93,9 +93,9 @@ export const completeOnboarding = async (uid: string) => {
   return updateUserProfile(uid, { onboardingCompleted: true });
 };
 
-// ========== ATLETA ==========
+// ========== PERFIS ESPECÍFICOS ==========
 
-export interface AtletaProfile {
+interface AtletaProfile {
   userId: string;
   position?: string;
   height?: number;
@@ -126,34 +126,7 @@ const createAtletaProfile = async (uid: string) => {
   await setDoc(atletaRef, atletaData);
 };
 
-export const getAtletaProfile = async (uid: string) => {
-  try {
-    const atletaRef = doc(db, 'atletas', uid);
-    const atletaSnap = await getDoc(atletaRef);
-
-    if (atletaSnap.exists()) {
-      return { success: true, data: atletaSnap.data() as AtletaProfile };
-    } else {
-      return { success: false, error: 'Perfil de atleta não encontrado' };
-    }
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-};
-
-export const updateAtletaProfile = async (uid: string, data: Partial<AtletaProfile>) => {
-  try {
-    const atletaRef = doc(db, 'atletas', uid);
-    await updateDoc(atletaRef, data);
-    return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-};
-
-// ========== CLUBE ==========
-
-export interface ClubeProfile {
+interface ClubeProfile {
   userId: string;
   clubName?: string;
   city?: string;
@@ -164,10 +137,6 @@ export interface ClubeProfile {
   openPositions?: string[];
   facilities?: string[];
   sponsorships?: string[];
-  website?: string;
-  instagram?: string;
-  phone?: string;
-  description?: string;
 }
 
 const createClubeProfile = async (uid: string) => {
@@ -181,34 +150,7 @@ const createClubeProfile = async (uid: string) => {
   await setDoc(clubeRef, clubeData);
 };
 
-export const getClubeProfile = async (uid: string) => {
-  try {
-    const clubeRef = doc(db, 'clubes', uid);
-    const clubeSnap = await getDoc(clubeRef);
-
-    if (clubeSnap.exists()) {
-      return { success: true, data: clubeSnap.data() as ClubeProfile };
-    } else {
-      return { success: false, error: 'Perfil de clube não encontrado' };
-    }
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-};
-
-export const updateClubeProfile = async (uid: string, data: Partial<ClubeProfile>) => {
-  try {
-    const clubeRef = doc(db, 'clubes', uid);
-    await updateDoc(clubeRef, data);
-    return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-};
-
-// ========== TREINADOR ==========
-
-export interface TreinadorProfile {
+interface TreinadorProfile {
   userId: string;
   specialties?: string[];
   experience?: string;
@@ -221,11 +163,6 @@ export interface TreinadorProfile {
   }[];
   mentorshipPrice?: number;
   availability?: string;
-  city?: string;
-  state?: string;
-  phone?: string;
-  bio?: string;
-  yearsOfExperience?: number;
 }
 
 const createTreinadorProfile = async (uid: string) => {
@@ -239,45 +176,12 @@ const createTreinadorProfile = async (uid: string) => {
   await setDoc(treinadorRef, treinadorData);
 };
 
-export const getTreinadorProfile = async (uid: string) => {
-  try {
-    const treinadorRef = doc(db, 'treinadores', uid);
-    const treinadorSnap = await getDoc(treinadorRef);
-
-    if (treinadorSnap.exists()) {
-      return { success: true, data: treinadorSnap.data() as TreinadorProfile };
-    } else {
-      return { success: false, error: 'Perfil de treinador não encontrado' };
-    }
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-};
-
-export const updateTreinadorProfile = async (uid: string, data: Partial<TreinadorProfile>) => {
-  try {
-    const treinadorRef = doc(db, 'treinadores', uid);
-    await updateDoc(treinadorRef, data);
-    return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-};
-
-// ========== AGENTE ==========
-
-export interface AgenteProfile {
+interface AgenteProfile {
   userId: string;
   athletes?: string[];
   clubs?: string[];
   successfulDeals?: number;
   specialization?: string;
-  city?: string;
-  state?: string;
-  phone?: string;
-  bio?: string;
-  yearsOfExperience?: number;
-  website?: string;
 }
 
 const createAgenteProfile = async (uid: string) => {
@@ -291,45 +195,13 @@ const createAgenteProfile = async (uid: string) => {
   await setDoc(agenteRef, agenteData);
 };
 
-export const getAgenteProfile = async (uid: string) => {
-  try {
-    const agenteRef = doc(db, 'agentes', uid);
-    const agenteSnap = await getDoc(agenteRef);
-
-    if (agenteSnap.exists()) {
-      return { success: true, data: agenteSnap.data() as AgenteProfile };
-    } else {
-      return { success: false, error: 'Perfil de agente não encontrado' };
-    }
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-};
-
-export const updateAgenteProfile = async (uid: string, data: Partial<AgenteProfile>) => {
-  try {
-    const agenteRef = doc(db, 'agentes', uid);
-    await updateDoc(agenteRef, data);
-    return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-};
-
-// ========== PATROCINADOR ==========
-
-export interface PatrocinadorProfile {
+interface PatrocinadorProfile {
   userId: string;
   brandName?: string;
   industry?: string;
   budget?: number;
   interests?: string[];
   currentSponsorships?: string[];
-  city?: string;
-  state?: string;
-  phone?: string;
-  website?: string;
-  description?: string;
 }
 
 const createPatrocinadorProfile = async (uid: string) => {
@@ -340,29 +212,4 @@ const createPatrocinadorProfile = async (uid: string) => {
     currentSponsorships: [],
   };
   await setDoc(patrocinadorRef, patrocinadorData);
-};
-
-export const getPatrocinadorProfile = async (uid: string) => {
-  try {
-    const patrocinadorRef = doc(db, 'patrocinadores', uid);
-    const patrocinadorSnap = await getDoc(patrocinadorRef);
-
-    if (patrocinadorSnap.exists()) {
-      return { success: true, data: patrocinadorSnap.data() as PatrocinadorProfile };
-    } else {
-      return { success: false, error: 'Perfil de patrocinador não encontrado' };
-    }
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-};
-
-export const updatePatrocinadorProfile = async (uid: string, data: Partial<PatrocinadorProfile>) => {
-  try {
-    const patrocinadorRef = doc(db, 'patrocinadores', uid);
-    await updateDoc(patrocinadorRef, data);
-    return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
 };

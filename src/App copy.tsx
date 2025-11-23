@@ -5,7 +5,6 @@ import { auth } from './firebase/config';
 import { logout } from './firebase/auth';
 import LoginModal from './components/LoginModal';
 import RegisterModal from './components/RegisterModal';
-import OnboardingRouter from './components/OnboardingRouter';
 
 // Declaração para suportar <style jsx>
 declare module 'react' {
@@ -611,9 +610,6 @@ export default function VoleihubEcosystem() {
           setShowLoginModal(true);
         }}
       />
-
-      {/* Onboarding Router - Detecta e mostra onboarding correto */}
-      <OnboardingRouter />
 
       <style jsx>{`
         @keyframes fade-in-up {
