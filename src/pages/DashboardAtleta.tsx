@@ -5,72 +5,85 @@ import { getUserProfile, getAtletaProfile, updateAtletaProfile, UserProfile, Atl
 import { logout } from '../firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { doc, setDoc } from 'firebase/firestore';
+import EditarPerfilModal from '../components/EditarPerfilModal';
 
 export default function DashboardAtleta() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [atletaProfile, setAtletaProfile] = useState<AtletaProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showEditModal, setShowEditModal] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      if (auth.currentUser) {
-        console.log('🔄 Carregando perfil do usuário...');
+  const loadProfiles = async () => {
+    if (auth.currentUser) {
+      console.log('🔄 Carregando perfis...');
+      
+      // Carregar perfil geral
+      const userResult = await getUserProfile(auth.currentUser.uid);
+      if (userResult.success && userResult.data) {
+        console.log('✅ Perfil de usuário carregado');
+        setUserProfile(userResult.data);
+      }
+
+      // Tentar carregar perfil de atleta
+      console.log('🔄 Carregando perfil de atleta...');
+      const atletaResult = await getAtletaProfile(auth.currentUser.uid);
+
+      if (atletaResult.success && atletaResult.data) {
+        console.log('✅ Perfil de atleta encontrado');
+        setAtletaProfile(atletaResult.data);
+      } else {
+        // Criar automaticamente se não existir
+        console.log('⚠️ Perfil de atleta não encontrado, criando...');
         
-        // Carregar perfil geral
-        const userResult = await getUserProfile(auth.currentUser.uid);
-        if (userResult.success && userResult.data) {
-          console.log('✅ Perfil de usuário carregado');
-          setUserProfile(userResult.data);
-        }
+        const novoPerfilAtleta: AtletaProfile = {
+          userId: auth.currentUser.uid,
+          position: 'Não definido',
+          height: 0,
+          weight: 0,
+          birthDate: '',
+          city: '',
+          state: '',
+          phone: '',
+          bio: 'Complete seu perfil para se destacar!',
+          stats: { aces: 0, blocks: 0, attacks: 0 },
+          videos: [],
+          achievements: [],
+          seeking: []
+        };
 
-        // Tentar carregar perfil de atleta
-        console.log('🔄 Carregando perfil de atleta...');
-        const atletaResult = await getAtletaProfile(auth.currentUser.uid);
-
-        if (atletaResult.success && atletaResult.data) {
-          console.log('✅ Perfil de atleta encontrado');
-          setAtletaProfile(atletaResult.data);
-        } else {
-          // SE NÃO EXISTIR, CRIAR AUTOMATICAMENTE!
-          console.log('⚠️ Perfil de atleta não encontrado, criando...');
-          
-          const novoPerfilAtleta: AtletaProfile = {
-            userId: auth.currentUser.uid,
-            position: 'Não definido',
-            height: 0,
-            weight: 0,
-            birthDate: '',
-            city: '',
-            state: '',
-            phone: '',
-            bio: 'Complete seu perfil para se destacar!',
-            stats: {
-              aces: 0,
-              blocks: 0,
-              attacks: 0
-            },
-            videos: [],
-            achievements: [],
-            seeking: []
-          };
-
-          try {
-            // Criar documento no Firestore
-            const atletaRef = doc(db, 'atletas', auth.currentUser.uid);
-            await setDoc(atletaRef, novoPerfilAtleta);
-            console.log('✅ Perfil de atleta criado automaticamente!');
-            setAtletaProfile(novoPerfilAtleta);
-          } catch (error) {
-            console.error('❌ Erro ao criar perfil de atleta:', error);
-          }
+        try {
+          const atletaRef = doc(db, 'atletas', auth.currentUser.uid);
+          await setDoc(atletaRef, novoPerfilAtleta);
+          console.log('✅ Perfil de atleta criado automaticamente!');
+          setAtletaProfile(novoPerfilAtleta);
+        } catch (error) {
+          console.error('❌ Erro ao criar perfil de atleta:', error);
         }
       }
-      setLoading(false);
-    };
+    }
+    setLoading(false);
+  };
 
-    loadProfile();
+  useEffect(() => {
+    loadProfiles();
   }, []);
+
+  const handleSaveProfile = async (updatedProfile: Partial<AtletaProfile>) => {
+    if (!auth.currentUser) return;
+    
+    console.log('💾 Salvando perfil atualizado...');
+    const result = await updateAtletaProfile(auth.currentUser.uid, updatedProfile);
+    
+    if (result.success) {
+      console.log('✅ Perfil atualizado com sucesso!');
+      // Recarregar perfil
+      await loadProfiles();
+    } else {
+      console.error('❌ Erro ao atualizar:', result.error);
+      throw new Error(result.error);
+    }
+  };
 
   const handleLogout = async () => {
     const confirmed = window.confirm('Tem certeza que deseja sair?');
@@ -91,31 +104,11 @@ export default function DashboardAtleta() {
     );
   }
 
-  if (!userProfile) {
+  if (!userProfile || !atletaProfile) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
         <div className="text-center">
           <div className="text-white text-xl mb-4">Erro ao carregar perfil</div>
-          <button
-            onClick={() => navigate('/')}
-            className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
-          >
-            Voltar para Home
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // SE AINDA ESTIVER SEM PERFIL DE ATLETA APÓS TENTATIVA DE CRIAÇÃO
-  if (!atletaProfile) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <div className="text-white text-xl mb-4">Perfil de atleta não encontrado</div>
-          <div className="text-gray-400 text-sm mb-6">
-            Não foi possível criar seu perfil automaticamente. Por favor, complete o onboarding novamente.
-          </div>
           <button
             onClick={() => navigate('/')}
             className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
@@ -202,7 +195,7 @@ export default function DashboardAtleta() {
                 {atletaProfile.birthDate && (
                   <div className="flex items-center gap-3 text-gray-400">
                     <Calendar className="w-4 h-4" />
-                    <span className="text-sm">{atletaProfile.birthDate}</span>
+                    <span className="text-sm">{new Date(atletaProfile.birthDate).toLocaleDateString('pt-BR')}</span>
                   </div>
                 )}
 
@@ -227,7 +220,7 @@ export default function DashboardAtleta() {
                   <h3 className="text-sm font-semibold text-white mb-3">Estou Procurando:</h3>
                   <div className="flex flex-wrap gap-2">
                     {atletaProfile.seeking.map((item, index) => (
-                      <span key={index} className="px-3 py-1 bg-white/5 text-gray-300 rounded-full text-xs">
+                      <span key={index} className="px-3 py-1 bg-white/5 text-gray-300 rounded-full text-xs capitalize">
                         {item}
                       </span>
                     ))}
@@ -236,7 +229,10 @@ export default function DashboardAtleta() {
               )}
 
               {/* Edit Button */}
-              <button className="w-full mt-6 px-4 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-orange-500/50 transition-all flex items-center justify-center gap-2">
+              <button 
+                onClick={() => setShowEditModal(true)}
+                className="w-full mt-6 px-4 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-orange-500/50 transition-all flex items-center justify-center gap-2"
+              >
                 <Edit2 className="w-4 h-4" />
                 Editar Perfil
               </button>
@@ -310,6 +306,15 @@ export default function DashboardAtleta() {
           </div>
         </div>
       </div>
+
+      {/* Modal de Edição */}
+      <EditarPerfilModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        atletaProfile={atletaProfile}
+        userDisplayName={userProfile.displayName}
+        onSave={handleSaveProfile}
+      />
     </div>
   );
 }
