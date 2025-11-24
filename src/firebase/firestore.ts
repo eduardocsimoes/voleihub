@@ -1,6 +1,13 @@
 import { getFirestore, doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { app } from './config';
 
+// Logo após os imports, ANTES de qualquer outra interface
+export interface Result<T = void> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
 export const db = getFirestore(app);
 
 export type ProfileType = 'atleta' | 'clube' | 'treinador' | 'agente' | 'patrocinador';
@@ -157,57 +164,82 @@ export const updateAtletaProfile = async (uid: string, data: Partial<AtletaProfi
 
 export interface ClubeProfile {
   userId: string;
-  photoURL?: string;  // ← ADICIONE ESTA LINHA
+  photoURL?: string;
   clubName?: string;
+  foundedYear?: number;
+  category?: string;
   city?: string;
   state?: string;
-  category?: string;
-  division?: string;
-  foundedYear?: number;
-  openPositions?: string[];
-  facilities?: string[];
-  sponsorships?: string[];
-  website?: string;
-  instagram?: string;
   phone?: string;
+  website?: string;
   description?: string;
+  stats?: {
+    athletes?: number;
+    titles?: number;
+    matches?: number;
+  };
+  achievements?: string[];
+  seeking?: ('atletas' | 'treinadores' | 'patrocinadores')[];
 }
 
 const createClubeProfile = async (uid: string) => {
   const clubeRef = doc(db, 'clubes', uid);
   const clubeData: ClubeProfile = {
     userId: uid,
-    openPositions: [],
-    facilities: [],
-    sponsorships: [],
   };
   await setDoc(clubeRef, clubeData);
 };
 
-export const getClubeProfile = async (uid: string) => {
-  try {
-    const clubeRef = doc(db, 'clubes', uid);
-    const clubeSnap = await getDoc(clubeRef);
+// ==========================================
+// FUNÇÕES PARA CLUBE
+// ==========================================
+// Adicione no final do seu firestore.ts (antes do último })
 
-    if (clubeSnap.exists()) {
-      return { success: true, data: clubeSnap.data() as ClubeProfile };
-    } else {
-      return { success: false, error: 'Perfil de clube não encontrado' };
+// Buscar perfil de clube
+export async function getClubeProfile(userId: string): Promise<Result<ClubeProfile>> {
+  try {
+    const docRef = doc(db, 'clubes', userId);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      return { 
+        success: true, 
+        data: docSnap.data() as ClubeProfile 
+      };
     }
+    
+    return { 
+      success: false, 
+      error: 'Perfil de clube não encontrado' 
+    };
   } catch (error: any) {
-    return { success: false, error: error.message };
+    console.error('❌ Erro ao buscar perfil de clube:', error);
+    return { 
+      success: false, 
+      error: error.message 
+    };
   }
-};
+}
 
-export const updateClubeProfile = async (uid: string, data: Partial<ClubeProfile>) => {
+// Atualizar perfil de clube
+export async function updateClubeProfile(
+  userId: string, 
+  data: Partial<ClubeProfile>
+): Promise<Result<void>> {
   try {
-    const clubeRef = doc(db, 'clubes', uid);
-    await updateDoc(clubeRef, data);
+    const docRef = doc(db, 'clubes', userId);
+    await updateDoc(docRef, data as any);
+    
+    console.log('✅ Perfil de clube atualizado!');
     return { success: true };
   } catch (error: any) {
-    return { success: false, error: error.message };
+    console.error('❌ Erro ao atualizar perfil de clube:', error);
+    return { 
+      success: false, 
+      error: error.message 
+    };
   }
-};
+}
 
 // ========== TREINADOR ==========
 
