@@ -29,7 +29,7 @@ export default function LandingPage() {
     const [onboardingCompleted, setOnboardingCompleted] = useState(false);
     const navigate = useNavigate();
   
-    // Listener de autenticação
+    // Listener de autenticação com redirecionamento automático
     useEffect(() => {
         console.log('🟢 useEffect de autenticação montado');
         
@@ -45,6 +45,12 @@ export default function LandingPage() {
               console.log('✅ Perfil encontrado');
               setOnboardingCompleted(result.data.onboardingCompleted);
               console.log('🎯 onboardingCompleted:', result.data.onboardingCompleted);
+              
+              // SE ONBOARDING COMPLETO, REDIRECIONAR PARA DASHBOARD
+              if (result.data.onboardingCompleted) {
+                console.log('🚀 Usuário com onboarding completo, redirecionando para dashboard...');
+                navigate('/dashboard');
+              }
             } else {
               console.error('❌ Erro ao buscar perfil:', result.error);
             }
@@ -58,7 +64,7 @@ export default function LandingPage() {
           console.log('🔴 useEffect de autenticação desmontado');
           unsubscribe();
         };
-      }, []);
+      }, [navigate]);
   
     // Scroll listener - CORRIGIDO SEM LOOP INFINITO
     useEffect(() => {
