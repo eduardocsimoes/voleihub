@@ -1,39 +1,36 @@
 import { useState, useEffect } from 'react';
-import { User, MapPin, Phone, Ruler, Weight, Calendar, Target, TrendingUp, Edit2, LogOut, Trophy } from 'lucide-react';
+import { User, MapPin, Phone, Ruler, Weight, Calendar, Target, TrendingUp, Edit2, LogOut, Trophy, X } from 'lucide-react';
 import { auth } from '../firebase/config';
 import { getUserProfile, getAtletaProfile, updateAtletaProfile, UserProfile, AtletaProfile, db } from '../firebase/firestore';
 import { logout } from '../firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { doc, setDoc } from 'firebase/firestore';
 import EditarPerfilModal from '../components/EditarPerfilModal';
+import UploadFotoPerfil from '../components/UploadFotoPerfil';
 
 export default function DashboardAtleta() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [atletaProfile, setAtletaProfile] = useState<AtletaProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const navigate = useNavigate();
 
   const loadProfiles = async () => {
     if (auth.currentUser) {
       console.log('🔄 Carregando perfis...');
       
-      // Carregar perfil geral
       const userResult = await getUserProfile(auth.currentUser.uid);
       if (userResult.success && userResult.data) {
         console.log('✅ Perfil de usuário carregado');
         setUserProfile(userResult.data);
       }
 
-      // Tentar carregar perfil de atleta
-      console.log('🔄 Carregando perfil de atleta...');
       const atletaResult = await getAtletaProfile(auth.currentUser.uid);
-
       if (atletaResult.success && atletaResult.data) {
         console.log('✅ Perfil de atleta encontrado');
         setAtletaProfile(atletaResult.data);
       } else {
-        // Criar automaticamente se não existir
         console.log('⚠️ Perfil de atleta não encontrado, criando...');
         
         const novoPerfilAtleta: AtletaProfile = {
@@ -77,12 +74,18 @@ export default function DashboardAtleta() {
     
     if (result.success) {
       console.log('✅ Perfil atualizado com sucesso!');
-      // Recarregar perfil
       await loadProfiles();
     } else {
       console.error('❌ Erro ao atualizar:', result.error);
       throw new Error(result.error);
     }
+  };
+
+  const handlePhotoUpdated = (newPhotoURL: string) => {
+    console.log('📸 Foto atualizada:', newPhotoURL);
+    // Recarregar perfis para atualizar foto
+    loadProfiles();
+    setShowUploadModal(false);
   };
 
   const handleLogout = async () => {
@@ -160,12 +163,36 @@ export default function DashboardAtleta() {
           {/* Left Column - Profile Card */}
           <div className="lg:col-span-1">
             <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6">
-              {/* Avatar */}
+              {/* Avatar com Upload */}
               <div className="flex flex-col items-center mb-6">
-                <div className="w-24 h-24 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center mb-4">
-                  <User className="w-12 h-12 text-white" />
+                <div 
+                  className="relative group cursor-pointer"
+                  onClick={() => setShowUploadModal(true)}
+                >
+                  <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white/10 bg-gradient-to-br from-orange-500 to-red-600">
+                    {userProfile.photoURL || atletaProfile.photoURL ? (
+                      <img
+                        src={userProfile.photoURL || atletaProfile.photoURL}
+                        alt={userProfile.displayName}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <User className="w-12 h-12 text-white" />
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Overlay de hover */}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                    <div className="text-center text-white">
+                      <Edit2 className="w-6 h-6 mx-auto mb-1" />
+                      <span className="text-xs font-semibold">Alterar</span>
+                    </div>
+                  </div>
                 </div>
-                <h2 className="text-xl font-bold text-white mb-1">{userProfile.displayName}</h2>
+                
+                <h2 className="text-xl font-bold text-white mb-1 mt-4">{userProfile.displayName}</h2>
                 <span className="px-3 py-1 bg-orange-500/20 text-orange-500 rounded-full text-sm font-semibold">
                   Atleta
                 </span>
@@ -315,6 +342,29 @@ export default function DashboardAtleta() {
         userDisplayName={userProfile.displayName}
         onSave={handleSaveProfile}
       />
+
+      {/* Modal de Upload de Foto */}
+      {showUploadModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="relative w-full max-w-md bg-gradient-to-br from-gray-900 via-gray-800 to-black rounded-2xl border border-white/10 shadow-2xl p-6">
+            <button
+              onClick={() => setShowUploadModal(false)}
+              className="absolute top-4 right-4 p-2 hover:bg-white/10 rounded-lg transition-colors"
+            >
+              <X className="w-6 h-6 text-gray-400" />
+            </button>
+
+            <h2 className="text-2xl font-black text-white mb-6 text-center">Foto de Perfil</h2>
+            
+            <UploadFotoPerfil
+              userId={userProfile.uid}
+              currentPhotoURL={userProfile.photoURL || atletaProfile.photoURL}
+              onPhotoUpdated={handlePhotoUpdated}
+              userType="atletas"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

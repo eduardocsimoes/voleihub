@@ -12,6 +12,7 @@ export interface UserProfile {
   profileType: ProfileType;
   createdAt: any;
   onboardingCompleted: boolean;
+  photoURL?: string;  // ← ADICIONE ESTA LINHA
   avatar?: string;
 }
 
@@ -97,6 +98,7 @@ export const completeOnboarding = async (uid: string) => {
 
 export interface AtletaProfile {
   userId: string;
+  photoURL?: string;  // ← ADICIONE ESTA LINHA
   position?: string;
   height?: number;
   weight?: number;
@@ -155,6 +157,7 @@ export const updateAtletaProfile = async (uid: string, data: Partial<AtletaProfi
 
 export interface ClubeProfile {
   userId: string;
+  photoURL?: string;  // ← ADICIONE ESTA LINHA
   clubName?: string;
   city?: string;
   state?: string;
@@ -210,6 +213,7 @@ export const updateClubeProfile = async (uid: string, data: Partial<ClubeProfile
 
 export interface TreinadorProfile {
   userId: string;
+  photoURL?: string;  // ← ADICIONE ESTA LINHA
   specialties?: string[];
   experience?: string;
   certifications?: string[];
@@ -268,6 +272,7 @@ export const updateTreinadorProfile = async (uid: string, data: Partial<Treinado
 
 export interface AgenteProfile {
   userId: string;
+  photoURL?: string;  // ← ADICIONE ESTA LINHA
   athletes?: string[];
   clubs?: string[];
   successfulDeals?: number;
@@ -320,6 +325,7 @@ export const updateAgenteProfile = async (uid: string, data: Partial<AgenteProfi
 
 export interface PatrocinadorProfile {
   userId: string;
+  photoURL?: string;  // ← ADICIONE ESTA LINHA
   brandName?: string;
   industry?: string;
   budget?: number;
