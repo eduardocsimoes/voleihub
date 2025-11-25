@@ -8,6 +8,9 @@ import { doc, setDoc } from 'firebase/firestore';
 import EditarPerfilModal from '../components/EditarPerfilModal';
 import UploadFotoPerfil from '../components/UploadFotoPerfil';
 
+import TimelineCarreira from '../components/TimelineCarreira';
+import AdicionarCarreira from '../components/AdicionarExperiencia';
+
 export default function DashboardAtleta() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [atletaProfile, setAtletaProfile] = useState<AtletaProfile | null>(null);
@@ -15,6 +18,9 @@ export default function DashboardAtleta() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const navigate = useNavigate();
+
+  const [showAddExperience, setShowAddExperience] = useState(false);
+  const [showAddAchievement, setShowAddAchievement] = useState(false);
 
   const loadProfiles = async () => {
     if (auth.currentUser) {
@@ -79,6 +85,29 @@ export default function DashboardAtleta() {
       console.error('❌ Erro ao atualizar:', result.error);
       throw new Error(result.error);
     }
+  };
+
+  const handleAddExperience = async (experience: any) => {
+    console.log('🔵 handleAddExperience chamado!');  // ← ADICIONE ESTA LINHA
+    if (!auth.currentUser || !atletaProfile) return;
+    
+    const updated = {
+      careerExperiences: [...(atletaProfile.careerExperiences || []), experience]
+    };
+    
+    await handleSaveProfile(updated);
+    setShowAddExperience(false);
+  };
+  
+  const handleAddAchievement = async (achievement: any) => {
+    if (!auth.currentUser || !atletaProfile) return;
+    
+    const updated = {
+      careerAchievements: [...(atletaProfile.careerAchievements || []), achievement]
+    };
+    
+    await handleSaveProfile(updated);
+    setShowAddAchievement(false);
   };
 
   const handlePhotoUpdated = (newPhotoURL: string) => {
@@ -276,6 +305,25 @@ export default function DashboardAtleta() {
               </p>
             </div>
 
+            <TimelineCarreira
+              experiences={atletaProfile.careerExperiences || []}
+              achievements={atletaProfile.careerAchievements || []}
+              onUpdate={(exp, ach) => {
+                handleSaveProfile({
+                  careerExperiences: exp,
+                  careerAchievements: ach
+                });
+              }}
+              editMode={true}
+              onAddExperience={() => {
+                console.log('🟢 CALLBACK CHAMADO!');
+                setShowAddExperience(true);
+              }}
+              onAddAchievement={() => {
+                console.log('🟡 CALLBACK CHAMADO!');
+                setShowAddAchievement(true);
+              }}
+            />
             {/* Stats */}
             <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6">
               <h3 className="text-xl font-bold text-white mb-6">Estatísticas</h3>
@@ -365,6 +413,22 @@ export default function DashboardAtleta() {
           </div>
         </div>
       )}
+
+    {/* Modal Adicionar Clube */}
+    <AdicionarCarreira
+      isOpen={showAddExperience}
+      onClose={() => setShowAddExperience(false)}
+      onSave={handleAddExperience}
+      type="experience"
+    />
+
+    {/* Modal Adicionar Título */}
+    <AdicionarCarreira
+      isOpen={showAddAchievement}
+      onClose={() => setShowAddAchievement(false)}
+      onSave={handleAddAchievement}
+      type="achievement"
+    />
     </div>
   );
 }

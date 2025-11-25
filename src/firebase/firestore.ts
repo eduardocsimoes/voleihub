@@ -1,6 +1,25 @@
 import { getFirestore, doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { app } from './config';
 
+export interface CareerExperience {
+  id: string;
+  clubName: string;
+  position: string;
+  startYear: number;
+  endYear?: number;
+  current: boolean;
+  description?: string;
+}
+
+export interface Achievement {
+  id: string;
+  title: string;
+  year: number;
+  championship: string;
+  placement: 'Campeão' | 'Vice-Campeão' | '3º Lugar' | 'Participante';
+  type: 'Coletivo' | 'Individual';
+}
+
 // Logo após os imports, ANTES de qualquer outra interface
 export interface Result<T = void> {
   success: boolean;
@@ -101,6 +120,8 @@ export const completeOnboarding = async (uid: string) => {
   return updateUserProfile(uid, { onboardingCompleted: true });
 };
 
+
+
 // ========== ATLETA ==========
 
 export interface AtletaProfile {
@@ -122,6 +143,8 @@ export interface AtletaProfile {
   videos?: string[];
   achievements?: string[];
   seeking?: ('clube' | 'patrocinio' | 'treinador')[];
+  careerExperiences?: CareerExperience[];
+  careerAchievements?: Achievement[];
 }
 
 const createAtletaProfile = async (uid: string) => {
