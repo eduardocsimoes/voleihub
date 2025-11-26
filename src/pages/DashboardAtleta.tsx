@@ -414,21 +414,22 @@ export default function DashboardAtleta() {
         </div>
       )}
 
-    {/* Modal Adicionar Clube */}
-    <AdicionarCarreira
-      isOpen={showAddExperience}
-      onClose={() => setShowAddExperience(false)}
-      onSave={handleAddExperience}
-      type="experience"
-    />
+      {/* Modal Adicionar Clube */}
+      <AdicionarCarreira
+        isOpen={showAddExperience}
+        onClose={() => setShowAddExperience(false)}
+        onSave={handleAddExperience}
+        type="experience"
+      />
 
-    {/* Modal Adicionar Título */}
-    <AdicionarCarreira
-      isOpen={showAddAchievement}
-      onClose={() => setShowAddAchievement(false)}
-      onSave={handleAddAchievement}
-      type="achievement"
-    />
+      {/* Modal Adicionar Título */}
+      <AdicionarCarreira
+        isOpen={showAddAchievement}
+        onClose={() => setShowAddAchievement(false)}
+        onSave={handleAddAchievement}
+        type="achievement"
+        registeredClubs={atletaProfile.careerExperiences?.map(exp => exp.clubName) || []}
+      />
     </div>
   );
 }

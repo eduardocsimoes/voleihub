@@ -11,13 +11,17 @@ export interface CareerExperience {
   description?: string;
 }
 
+// Títulos e Prêmios - NOVA ESTRUTURA
 export interface Achievement {
   id: string;
-  title: string;
-  year: number;
   championship: string;
-  placement: 'Campeão' | 'Vice-Campeão' | '3º Lugar' | 'Participante';
+  year: number;
+  club: string;
   type: 'Coletivo' | 'Individual';
+  placement?: '1º Lugar' | '2º Lugar' | '3º Lugar' | 'Participante';
+  award?: 'MVP' | 'Melhor Ponteiro' | 'Melhor Levantador' | 'Melhor Central' | 
+          'Melhor Líbero' | 'Melhor Oposto' | 'Melhor Sacador' | 
+          'Melhor Bloqueador' | 'Destaque' | 'Revelação';
 }
 
 // Logo após os imports, ANTES de qualquer outra interface

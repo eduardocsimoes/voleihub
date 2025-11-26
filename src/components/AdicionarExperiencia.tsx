@@ -1,30 +1,13 @@
 import { useState } from 'react';
 import { X, Building2, Trophy } from 'lucide-react';
-
-interface CareerExperience {
-  id: string;
-  clubName: string;
-  position: string;
-  startYear: number;
-  endYear?: number;
-  current: boolean;
-  description?: string;
-}
-
-interface Achievement {
-  id: string;
-  title: string;
-  year: number;
-  championship: string;
-  placement: 'Campeão' | 'Vice-Campeão' | '3º Lugar' | 'Participante';
-  type: 'Coletivo' | 'Individual';
-}
+import type { CareerExperience, Achievement } from '../firebase/firestore';
 
 interface AdicionarExperienciaProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (experience: CareerExperience) => void;
   type: 'experience';
+  registeredClubs?: string[];
 }
 
 interface AdicionarTituloProps {
@@ -32,11 +15,12 @@ interface AdicionarTituloProps {
   onClose: () => void;
   onSave: (achievement: Achievement) => void;
   type: 'achievement';
+  registeredClubs?: string[];
 }
 
 type Props = AdicionarExperienciaProps | AdicionarTituloProps;
 
-export default function AdicionarCarreira({ isOpen, onClose, onSave, type }: Props) {
+export default function AdicionarCarreira({ isOpen, onClose, onSave, type, registeredClubs = [] }: Props) {
   const [formData, setFormData] = useState<{
     clubName: string;
     position: string;
@@ -44,10 +28,11 @@ export default function AdicionarCarreira({ isOpen, onClose, onSave, type }: Pro
     endYear: number;
     current: boolean;
     description: string;
-    title: string;
-    year: number;
     championship: string;
-    placement: 'Campeão' | 'Vice-Campeão' | '3º Lugar' | 'Participante';
+    year: number;
+    club: string;
+    placement: '1º Lugar' | '2º Lugar' | '3º Lugar' | 'Participante';
+    award: 'MVP' | 'Melhor Ponteiro' | 'Melhor Levantador' | 'Melhor Central' | 'Melhor Líbero' | 'Melhor Oposto' | 'Melhor Sacador' | 'Melhor Bloqueador' | 'Destaque' | 'Revelação';
     achievementType: 'Coletivo' | 'Individual';
   }>({
     clubName: '',
@@ -56,12 +41,15 @@ export default function AdicionarCarreira({ isOpen, onClose, onSave, type }: Pro
     endYear: new Date().getFullYear(),
     current: false,
     description: '',
-    title: '',
-    year: new Date().getFullYear(),
     championship: '',
-    placement: 'Campeão',
+    year: new Date().getFullYear(),
+    club: registeredClubs.length > 0 ? registeredClubs[0] : '',
+    placement: '1º Lugar',
+    award: 'MVP',
     achievementType: 'Coletivo'
   });
+
+  const [showCustomClub, setShowCustomClub] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,11 +68,14 @@ export default function AdicionarCarreira({ isOpen, onClose, onSave, type }: Pro
     } else {
       const achievement: Achievement = {
         id: Date.now().toString(),
-        title: formData.title,
-        year: formData.year,
         championship: formData.championship,
-        placement: formData.placement,
-        type: formData.achievementType
+        year: formData.year,
+        club: formData.club,
+        type: formData.achievementType,
+        ...(formData.achievementType === 'Coletivo' 
+          ? { placement: formData.placement }
+          : { award: formData.award }
+        )
       };
       onSave(achievement);
     }
@@ -97,12 +88,14 @@ export default function AdicionarCarreira({ isOpen, onClose, onSave, type }: Pro
       endYear: new Date().getFullYear(),
       current: false,
       description: '',
-      title: '',
-      year: new Date().getFullYear(),
       championship: '',
-      placement: 'Campeão',
+      year: new Date().getFullYear(),
+      club: registeredClubs.length > 0 ? registeredClubs[0] : '',
+      placement: '1º Lugar',
+      award: 'MVP',
       achievementType: 'Coletivo'
     });
+    setShowCustomClub(false);
     onClose();
   };
 
@@ -120,7 +113,7 @@ export default function AdicionarCarreira({ isOpen, onClose, onSave, type }: Pro
               <Trophy className="w-6 h-6 text-yellow-500" />
             )}
             <h2 className="text-xl font-bold text-white">
-              {type === 'experience' ? 'Adicionar Clube' : 'Adicionar Título'}
+              {type === 'experience' ? 'Adicionar Clube' : 'Adicionar Título/Prêmio'}
             </h2>
           </div>
           <button
@@ -132,9 +125,10 @@ export default function AdicionarCarreira({ isOpen, onClose, onSave, type }: Pro
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
           {type === 'experience' ? (
             <>
+              {/* FORMULÁRIO DE CLUBE (mantém igual) */}
               <div>
                 <label className="block text-sm font-semibold text-gray-300 mb-2">
                   Nome do Clube *
@@ -226,20 +220,38 @@ export default function AdicionarCarreira({ isOpen, onClose, onSave, type }: Pro
             </>
           ) : (
             <>
+              {/* TIPO: COLETIVO OU INDIVIDUAL */}
               <div>
                 <label className="block text-sm font-semibold text-gray-300 mb-2">
-                  Título/Prêmio *
+                  Tipo *
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500"
-                  placeholder="Ex: Superliga 2023"
-                />
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, achievementType: 'Coletivo' })}
+                    className={`px-4 py-3 rounded-lg font-semibold transition-all ${
+                      formData.achievementType === 'Coletivo'
+                        ? 'bg-yellow-500 text-white'
+                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                    }`}
+                  >
+                    🏆 Título Coletivo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, achievementType: 'Individual' })}
+                    className={`px-4 py-3 rounded-lg font-semibold transition-all ${
+                      formData.achievementType === 'Individual'
+                        ? 'bg-purple-500 text-white'
+                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                    }`}
+                  >
+                    ⭐ Prêmio Individual
+                  </button>
+                </div>
               </div>
 
+              {/* CAMPEONATO */}
               <div>
                 <label className="block text-sm font-semibold text-gray-300 mb-2">
                   Campeonato *
@@ -254,7 +266,61 @@ export default function AdicionarCarreira({ isOpen, onClose, onSave, type }: Pro
                 />
               </div>
 
+              {/* CLUBE/SELEÇÃO */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-300 mb-2">
+                  Clube/Seleção *
+                </label>
+                {registeredClubs.length > 0 ? (
+                  <>
+                    <select
+                      value={showCustomClub ? 'outro' : formData.club}
+                      onChange={(e) => {
+                        if (e.target.value === 'outro') {
+                          setShowCustomClub(true);
+                          setFormData({ ...formData, club: '' });
+                        } else {
+                          setShowCustomClub(false);
+                          setFormData({ ...formData, club: e.target.value });
+                        }
+                      }}
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-500"
+                    >
+                      {registeredClubs.map((clube) => (
+                        <option key={clube} value={clube} className="bg-gray-800 text-white">
+                          {clube}
+                        </option>
+                      ))}
+                      <option value="outro" className="bg-gray-800 text-white">
+                        ➕ Outro clube/seleção
+                      </option>
+                    </select>
+                    
+                    {showCustomClub && (
+                      <input
+                        type="text"
+                        required
+                        value={formData.club}
+                        onChange={(e) => setFormData({ ...formData, club: e.target.value })}
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 mt-2"
+                        placeholder="Digite o nome do clube ou seleção"
+                      />
+                    )}
+                  </>
+                ) : (
+                  <input
+                    type="text"
+                    required
+                    value={formData.club}
+                    onChange={(e) => setFormData({ ...formData, club: e.target.value })}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500"
+                    placeholder="Ex: Minas Tênis Clube, Seleção Brasileira..."
+                  />
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
+                {/* ANO */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-300 mb-2">
                     Ano *
@@ -270,51 +336,46 @@ export default function AdicionarCarreira({ isOpen, onClose, onSave, type }: Pro
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">
-                    Colocação *
-                  </label>
-                  <select
-                    value={formData.placement}
-                    onChange={(e) => setFormData({ ...formData, placement: e.target.value as any })}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-500"
-                  >
-                    <option value="Campeão">🥇 Campeão</option>
-                    <option value="Vice-Campeão">🥈 Vice</option>
-                    <option value="3º Lugar">🥉 3º Lugar</option>
-                    <option value="Participante">Participante</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">
-                  Tipo *
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, achievementType: 'Coletivo' })}
-                    className={`px-4 py-3 rounded-lg font-semibold transition-all ${
-                      formData.achievementType === 'Coletivo'
-                        ? 'bg-yellow-500 text-white'
-                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                    }`}
-                  >
-                    🏆 Coletivo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, achievementType: 'Individual' })}
-                    className={`px-4 py-3 rounded-lg font-semibold transition-all ${
-                      formData.achievementType === 'Individual'
-                        ? 'bg-purple-500 text-white'
-                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                    }`}
-                  >
-                    ⭐ Individual
-                  </button>
-                </div>
+                {/* COLOCAÇÃO (SE COLETIVO) OU PRÊMIO (SE INDIVIDUAL) */}
+                {formData.achievementType === 'Coletivo' ? (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-300 mb-2">
+                      Colocação *
+                    </label>
+                    <select
+                      value={formData.placement}
+                      onChange={(e) => setFormData({ ...formData, placement: e.target.value as any })}
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-yellow-500"
+                    >
+                      <option value="1º Lugar" className="bg-gray-800 text-white">🥇 1º Lugar</option>
+                      <option value="2º Lugar" className="bg-gray-800 text-white">🥈 2º Lugar</option>
+                      <option value="3º Lugar" className="bg-gray-800 text-white">🥉 3º Lugar</option>
+                      <option value="Participante" className="bg-gray-800 text-white">🏆 Participante</option>
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-300 mb-2">
+                      Prêmio *
+                    </label>
+                    <select
+                      value={formData.award}
+                      onChange={(e) => setFormData({ ...formData, award: e.target.value as any })}
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                    >
+                      <option value="MVP" className="bg-gray-800 text-white">👑 MVP (Melhor Jogador)</option>
+                      <option value="Melhor Ponteiro" className="bg-gray-800 text-white">🎯 Melhor Ponteiro</option>
+                      <option value="Melhor Levantador" className="bg-gray-800 text-white">🎯 Melhor Levantador</option>
+                      <option value="Melhor Central" className="bg-gray-800 text-white">🎯 Melhor Central</option>
+                      <option value="Melhor Líbero" className="bg-gray-800 text-white">🎯 Melhor Líbero</option>
+                      <option value="Melhor Oposto" className="bg-gray-800 text-white">🎯 Melhor Oposto</option>
+                      <option value="Melhor Sacador" className="bg-gray-800 text-white">⚡ Melhor Sacador</option>
+                      <option value="Melhor Bloqueador" className="bg-gray-800 text-white">🧱 Melhor Bloqueador</option>
+                      <option value="Destaque" className="bg-gray-800 text-white">⭐ Destaque da Competição</option>
+                      <option value="Revelação" className="bg-gray-800 text-white">🌟 Revelação</option>
+                    </select>
+                  </div>
+                )}
               </div>
             </>
           )}
