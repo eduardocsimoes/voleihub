@@ -11,7 +11,6 @@ export interface CareerExperience {
   description?: string;
 }
 
-// Títulos e Prêmios - NOVA ESTRUTURA
 export interface Achievement {
   id: string;
   championship: string;
@@ -24,7 +23,6 @@ export interface Achievement {
           'Melhor Bloqueador' | 'Destaque' | 'Revelação';
 }
 
-// Logo após os imports, ANTES de qualquer outra interface
 export interface Result<T = void> {
   success: boolean;
   data?: T;
@@ -42,11 +40,10 @@ export interface UserProfile {
   profileType: ProfileType;
   createdAt: any;
   onboardingCompleted: boolean;
-  photoURL?: string;  // ← ADICIONE ESTA LINHA
+  photoURL?: string;
   avatar?: string;
 }
 
-// Criar perfil de usuário no Firestore após registro
 export const createUserProfile = async (
   uid: string,
   email: string,
@@ -67,10 +64,9 @@ export const createUserProfile = async (
 
     await setDoc(userRef, userData);
 
-    // Criar documento específico do perfil
     switch (profileType) {
       case 'atleta':
-        await createAtletaProfile(uid);
+        await createAtletaProfile(uid, email, displayName);
         break;
       case 'clube':
         await createClubeProfile(uid);
@@ -92,14 +88,23 @@ export const createUserProfile = async (
   }
 };
 
-// Buscar perfil do usuário
 export const getUserProfile = async (uid: string) => {
   try {
     const userRef = doc(db, 'users', uid);
     const userSnap = await getDoc(userRef);
 
     if (userSnap.exists()) {
-      return { success: true, data: userSnap.data() as UserProfile };
+      const userData = userSnap.data() as UserProfile;
+      
+      // Buscar dados específicos do perfil
+      if (userData.profileType === 'atleta') {
+        const atletaResult = await getAtletaProfile(uid);
+        if (atletaResult.success && atletaResult.data) {
+          return { success: true, data: { ...userData, ...atletaResult.data } as AtletaProfile };
+        }
+      }
+      
+      return { success: true, data: userData };
     } else {
       return { success: false, error: 'Usuário não encontrado' };
     }
@@ -108,29 +113,38 @@ export const getUserProfile = async (uid: string) => {
   }
 };
 
-// Atualizar perfil do usuário
 export const updateUserProfile = async (uid: string, data: Partial<UserProfile>) => {
   try {
     const userRef = doc(db, 'users', uid);
     await updateDoc(userRef, data);
+    
+    // Se for atleta, atualizar também o documento de atleta
+    const userSnap = await getDoc(userRef);
+    if (userSnap.exists()) {
+      const userData = userSnap.data() as UserProfile;
+      if (userData.profileType === 'atleta') {
+        const atletaRef = doc(db, 'atletas', uid);
+        await updateDoc(atletaRef, data);
+      }
+    }
+    
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
 };
 
-// Marcar onboarding como completo
 export const completeOnboarding = async (uid: string) => {
   return updateUserProfile(uid, { onboardingCompleted: true });
 };
 
-
-
 // ========== ATLETA ==========
 
-export interface AtletaProfile {
+export interface AtletaProfile extends UserProfile {
   userId: string;
-  photoURL?: string;  // ← ADICIONE ESTA LINHA
+  name: string;
+  email: string;
+  photoURL?: string;
   position?: string;
   height?: number;
   weight?: number;
@@ -151,13 +165,17 @@ export interface AtletaProfile {
   careerAchievements?: Achievement[];
 }
 
-const createAtletaProfile = async (uid: string) => {
+const createAtletaProfile = async (uid: string, email: string, name: string) => {
   const atletaRef = doc(db, 'atletas', uid);
-  const atletaData: AtletaProfile = {
+  const atletaData: Partial<AtletaProfile> = {
     userId: uid,
+    name: name,
+    email: email,
     videos: [],
     achievements: [],
     seeking: [],
+    careerExperiences: [],
+    careerAchievements: [],
   };
   await setDoc(atletaRef, atletaData);
 };
@@ -217,12 +235,6 @@ const createClubeProfile = async (uid: string) => {
   await setDoc(clubeRef, clubeData);
 };
 
-// ==========================================
-// FUNÇÕES PARA CLUBE
-// ==========================================
-// Adicione no final do seu firestore.ts (antes do último })
-
-// Buscar perfil de clube
 export async function getClubeProfile(userId: string): Promise<Result<ClubeProfile>> {
   try {
     const docRef = doc(db, 'clubes', userId);
@@ -248,7 +260,6 @@ export async function getClubeProfile(userId: string): Promise<Result<ClubeProfi
   }
 }
 
-// Atualizar perfil de clube
 export async function updateClubeProfile(
   userId: string, 
   data: Partial<ClubeProfile>
@@ -272,7 +283,7 @@ export async function updateClubeProfile(
 
 export interface TreinadorProfile {
   userId: string;
-  photoURL?: string;  // ← ADICIONE ESTA LINHA
+  photoURL?: string;
   specialties?: string[];
   experience?: string;
   certifications?: string[];
@@ -331,7 +342,7 @@ export const updateTreinadorProfile = async (uid: string, data: Partial<Treinado
 
 export interface AgenteProfile {
   userId: string;
-  photoURL?: string;  // ← ADICIONE ESTA LINHA
+  photoURL?: string;
   athletes?: string[];
   clubs?: string[];
   successfulDeals?: number;
@@ -384,7 +395,7 @@ export const updateAgenteProfile = async (uid: string, data: Partial<AgenteProfi
 
 export interface PatrocinadorProfile {
   userId: string;
-  photoURL?: string;  // ← ADICIONE ESTA LINHA
+  photoURL?: string;
   brandName?: string;
   industry?: string;
   budget?: number;

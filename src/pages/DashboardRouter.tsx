@@ -67,7 +67,7 @@ export default function DashboardRouter() {
       console.log('🔴 DashboardRouter desmontado');
       unsubscribe();
     };
-  }, [navigate]);
+  }, []); // ✅ SEM DEPENDENCIES! Executa apenas 1x
 
   // Loading state
   if (loading) {

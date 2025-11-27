@@ -1,144 +1,68 @@
 import { useState, useEffect } from 'react';
-import { X, Save, User, MapPin, Phone, Ruler, Weight, Calendar, Target, MessageSquare, Trophy, Plus, Trash2 } from 'lucide-react';
-import { AtletaProfile } from '../firebase/firestore';
+import { X, User, Calendar, Ruler, Weight, MapPin, FileText } from 'lucide-react';
+import type { AtletaProfile } from '../firebase/firestore';
 
 interface EditarPerfilModalProps {
   isOpen: boolean;
   onClose: () => void;
   atletaProfile: AtletaProfile;
-  userDisplayName: string;
-  onSave: (updatedProfile: Partial<AtletaProfile>) => Promise<void>;
+  onSave: (updates: Partial<AtletaProfile>) => Promise<void>;
 }
 
-export default function EditarPerfilModal({ 
-  isOpen, 
-  onClose, 
-  atletaProfile, 
-  userDisplayName,
-  onSave 
+export default function EditarPerfilModal({
+  isOpen,
+  onClose,
+  atletaProfile,
+  onSave
 }: EditarPerfilModalProps) {
-  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    position: '',
-    height: 0,
-    weight: 0,
-    birthDate: '',
-    city: '',
-    state: '',
-    phone: '',
+    name: '',
     bio: '',
-    statsAces: 0,
-    statsBlocks: 0,
-    statsAttacks: 0,
-    achievements: [] as string[],
-    videos: [] as string[],
-    seeking: [] as ('clube' | 'patrocinio' | 'treinador')[]
+    birthDate: '',
+    height: '',
+    weight: '',
+    position: 'Ponteiro',
+    city: '',
+    state: ''
   });
 
-  const [newAchievement, setNewAchievement] = useState('');
-  const [newVideo, setNewVideo] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  // Carregar dados atuais quando o modal abre
   useEffect(() => {
-    if (isOpen && atletaProfile) {
+    if (isOpen) {
       setFormData({
-        position: atletaProfile.position || '',
-        height: atletaProfile.height || 0,
-        weight: atletaProfile.weight || 0,
-        birthDate: atletaProfile.birthDate || '',
-        city: atletaProfile.city || '',
-        state: atletaProfile.state || '',
-        phone: atletaProfile.phone || '',
+        name: atletaProfile.name || '',
         bio: atletaProfile.bio || '',
-        statsAces: atletaProfile.stats?.aces || 0,
-        statsBlocks: atletaProfile.stats?.blocks || 0,
-        statsAttacks: atletaProfile.stats?.attacks || 0,
-        achievements: atletaProfile.achievements || [],
-        videos: atletaProfile.videos || [],
-        seeking: atletaProfile.seeking || []
+        birthDate: atletaProfile.birthDate || '',
+        height: atletaProfile.height?.toString() || '',
+        weight: atletaProfile.weight?.toString() || '',
+        position: atletaProfile.position || 'Ponteiro',
+        city: atletaProfile.city || '',
+        state: atletaProfile.state || ''
       });
     }
   }, [isOpen, atletaProfile]);
 
-  const handleChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const addAchievement = () => {
-    if (newAchievement.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        achievements: [...prev.achievements, newAchievement.trim()]
-      }));
-      setNewAchievement('');
-    }
-  };
-
-  const removeAchievement = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      achievements: prev.achievements.filter((_, i) => i !== index)
-    }));
-  };
-
-  const addVideo = () => {
-    if (newVideo.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        videos: [...prev.videos, newVideo.trim()]
-      }));
-      setNewVideo('');
-    }
-  };
-
-  const removeVideo = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      videos: prev.videos.filter((_, i) => i !== index)
-    }));
-  };
-
-  const toggleSeeking = (item: 'clube' | 'patrocinio' | 'treinador') => {
-    setFormData(prev => ({
-      ...prev,
-      seeking: prev.seeking.includes(item)
-        ? prev.seeking.filter(s => s !== item)
-        : [...prev.seeking, item]
-    }));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSaving(true);
 
     try {
-      const updatedProfile: Partial<AtletaProfile> = {
-        position: formData.position,
-        height: Number(formData.height),
-        weight: Number(formData.weight),
-        birthDate: formData.birthDate,
-        city: formData.city,
-        state: formData.state,
-        phone: formData.phone,
+      await onSave({
+        name: formData.name,
         bio: formData.bio,
-        stats: {
-          aces: Number(formData.statsAces),
-          blocks: Number(formData.statsBlocks),
-          attacks: Number(formData.statsAttacks)
-        },
-        achievements: formData.achievements,
-        videos: formData.videos,
-        seeking: formData.seeking
-      };
-
-      await onSave(updatedProfile);
-      alert('✅ Perfil atualizado com sucesso!');
+        birthDate: formData.birthDate,
+        height: formData.height ? Number(formData.height) : undefined,
+        weight: formData.weight ? Number(formData.weight) : undefined,
+        position: formData.position,
+        city: formData.city,
+        state: formData.state
+      });
       onClose();
     } catch (error) {
       console.error('Erro ao salvar:', error);
-      alert('❌ Erro ao atualizar perfil. Tente novamente.');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
@@ -146,305 +70,79 @@ export default function EditarPerfilModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="relative w-full max-w-4xl max-h-[90vh] bg-gradient-to-br from-gray-900 via-gray-800 to-black rounded-2xl border border-white/10 shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur-lg border-b border-white/10 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-black text-white">Editar Perfil</h2>
-              <p className="text-gray-400 text-sm mt-1">{userDisplayName}</p>
+      <div className="relative w-full max-w-3xl bg-gradient-to-br from-gray-900 via-gray-800 to-black rounded-3xl border border-white/10 shadow-2xl shadow-black/50 max-h-[90vh] overflow-hidden">
+        <div className="relative overflow-hidden bg-gradient-to-r from-orange-500/20 to-red-600/20 border-b border-white/10 p-6">
+          <div className="relative flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-orange-500/20 text-orange-400 rounded-xl"><User className="w-6 h-6" /></div>
+              <div>
+                <h2 className="text-2xl font-bold text-white">Editar Perfil</h2>
+                <p className="text-gray-400 text-sm mt-1">Atualize suas informações pessoais</p>
+              </div>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-            >
-              <X className="w-6 h-6 text-gray-400" />
-            </button>
+            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors" disabled={saving}><X className="w-5 h-5 text-gray-400" /></button>
           </div>
         </div>
 
-        {/* Content */}
-        <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(90vh-140px)] px-6 py-6">
-          <div className="space-y-6">
-            {/* Informações Básicas */}
-            <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <User className="w-5 h-5 text-orange-500" />
-                Informações Básicas
-              </h3>
-              
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">
-                    Posição
-                  </label>
-                  <select
-                    value={formData.position}
-                    onChange={(e) => handleChange('position', e.target.value)}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:border-orange-500 focus:outline-none transition-colors"
-                  >
-                    <option value="">Selecione</option>
-                    <option value="Levantador">Levantador</option>
-                    <option value="Oposto">Oposto</option>
-                    <option value="Ponteiro">Ponteiro</option>
-                    <option value="Central">Central</option>
-                    <option value="Líbero">Líbero</option>
-                  </select>
-                </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+          <div>
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2"><User className="w-4 h-4 text-orange-400" />Nome Completo *</label>
+            <input type="text" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all" placeholder="Seu nome completo" />
+          </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">
-                    Data de Nascimento
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.birthDate}
-                    onChange={(e) => handleChange('birthDate', e.target.value)}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:border-orange-500 focus:outline-none transition-colors"
-                  />
-                </div>
+          <div>
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2"><FileText className="w-4 h-4 text-blue-400" />Biografia</label>
+            <textarea rows={4} value={formData.bio} onChange={(e) => setFormData({ ...formData, bio: e.target.value })} className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all resize-none" placeholder="Conte um pouco sobre você, sua trajetória, objetivos..." />
+            <p className="text-gray-500 text-xs mt-2">Esta descrição aparecerá no seu perfil público</p>
+          </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">
-                    Altura (cm)
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.height || ''}
-                    onChange={(e) => handleChange('height', e.target.value)}
-                    placeholder="Ex: 185"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:border-orange-500 focus:outline-none transition-colors"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">
-                    Peso (kg)
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.weight || ''}
-                    onChange={(e) => handleChange('weight', e.target.value)}
-                    placeholder="Ex: 80"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:border-orange-500 focus:outline-none transition-colors"
-                  />
-                </div>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2"><MapPin className="w-4 h-4 text-purple-400" />Posição *</label>
+              <select value={formData.position} onChange={(e) => setFormData({ ...formData, position: e.target.value })} className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all">
+                <option value="Ponteiro" className="bg-gray-800">Ponteiro</option>
+                <option value="Oposto" className="bg-gray-800">Oposto</option>
+                <option value="Central" className="bg-gray-800">Central</option>
+                <option value="Levantador" className="bg-gray-800">Levantador</option>
+                <option value="Líbero" className="bg-gray-800">Líbero</option>
+              </select>
             </div>
 
-            {/* Contato e Localização */}
-            <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-orange-500" />
-                Contato e Localização
-              </h3>
-              
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">
-                    Cidade
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.city}
-                    onChange={(e) => handleChange('city', e.target.value)}
-                    placeholder="Ex: Rio de Janeiro"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:border-orange-500 focus:outline-none transition-colors"
-                  />
-                </div>
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2"><Calendar className="w-4 h-4 text-green-400" />Data de Nascimento</label>
+              <input type="date" value={formData.birthDate} onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })} className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all" />
+            </div>
+          </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">
-                    Estado (UF)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.state}
-                    onChange={(e) => handleChange('state', e.target.value)}
-                    placeholder="Ex: RJ"
-                    maxLength={2}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:border-orange-500 focus:outline-none transition-colors uppercase"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">
-                    Telefone/WhatsApp
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => handleChange('phone', e.target.value)}
-                    placeholder="Ex: +55 21 99999-9999"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:border-orange-500 focus:outline-none transition-colors"
-                  />
-                </div>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2"><Ruler className="w-4 h-4 text-blue-400" />Altura (cm)</label>
+              <input type="number" min="150" max="250" value={formData.height} onChange={(e) => setFormData({ ...formData, height: e.target.value })} className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all" placeholder="180" />
             </div>
 
-            {/* Biografia */}
-            <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-orange-500" />
-                Sobre Você
-              </h3>
-              
-              <textarea
-                value={formData.bio}
-                onChange={(e) => handleChange('bio', e.target.value)}
-                placeholder="Conte sua história, suas conquistas e seus objetivos no vôlei..."
-                rows={4}
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:border-orange-500 focus:outline-none transition-colors resize-none"
-              />
-              <p className="text-gray-400 text-xs mt-2">{formData.bio.length}/500 caracteres</p>
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2"><Weight className="w-4 h-4 text-yellow-400" />Peso (kg)</label>
+              <input type="number" min="40" max="150" value={formData.weight} onChange={(e) => setFormData({ ...formData, weight: e.target.value })} className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 transition-all" placeholder="75" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2"><MapPin className="w-4 h-4 text-red-400" />Cidade</label>
+              <input type="text" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 transition-all" placeholder="São Paulo" />
             </div>
 
-            {/* Estatísticas */}
-            <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <Target className="w-5 h-5 text-orange-500" />
-                Estatísticas
-              </h3>
-              
-              <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">
-                    Aces
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.statsAces || ''}
-                    onChange={(e) => handleChange('statsAces', e.target.value)}
-                    placeholder="0"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:border-orange-500 focus:outline-none transition-colors"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">
-                    Bloqueios
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.statsBlocks || ''}
-                    onChange={(e) => handleChange('statsBlocks', e.target.value)}
-                    placeholder="0"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:border-orange-500 focus:outline-none transition-colors"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">
-                    Ataques
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.statsAttacks || ''}
-                    onChange={(e) => handleChange('statsAttacks', e.target.value)}
-                    placeholder="0"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:border-orange-500 focus:outline-none transition-colors"
-                  />
-                </div>
-              </div>
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2"><MapPin className="w-4 h-4 text-pink-400" />Estado</label>
+              <input type="text" maxLength={2} value={formData.state} onChange={(e) => setFormData({ ...formData, state: e.target.value.toUpperCase() })} className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 transition-all uppercase" placeholder="SP" />
             </div>
+          </div>
 
-            {/* Conquistas */}
-            <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-orange-500" />
-                Conquistas
-              </h3>
-              
-              <div className="space-y-3 mb-4">
-                {formData.achievements.map((achievement, index) => (
-                  <div key={index} className="flex items-center gap-3 bg-white/5 p-3 rounded-lg border border-white/10">
-                    <Trophy className="w-4 h-4 text-orange-500 flex-shrink-0" />
-                    <span className="text-gray-300 flex-1">{achievement}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeAchievement(index)}
-                      className="p-1 hover:bg-red-500/20 rounded transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4 text-red-400" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newAchievement}
-                  onChange={(e) => setNewAchievement(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addAchievement())}
-                  placeholder="Ex: Campeão Estadual 2023"
-                  className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:border-orange-500 focus:outline-none transition-colors"
-                />
-                <button
-                  type="button"
-                  onClick={addAchievement}
-                  className="px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Adicionar
-                </button>
-              </div>
-            </div>
-
-            {/* Estou Procurando */}
-            <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-              <h3 className="text-lg font-bold text-white mb-4">Estou Procurando</h3>
-              
-              <div className="flex flex-wrap gap-3">
-                {(['clube', 'patrocinio', 'treinador'] as const).map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => toggleSeeking(item)}
-                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                      formData.seeking.includes(item)
-                        ? 'bg-orange-500 text-white'
-                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                    }`}
-                  >
-                    {item.charAt(0).toUpperCase() + item.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
+          <div className="flex gap-3 pt-4 border-t border-white/10">
+            <button type="button" onClick={onClose} disabled={saving} className="flex-1 px-6 py-3 bg-white/5 hover:bg-white/10 text-gray-300 rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed">Cancelar</button>
+            <button type="submit" disabled={saving} className="flex-1 px-6 py-3 bg-gradient-to-r from-orange-500 to-red-600 hover:shadow-lg hover:shadow-orange-500/50 text-white rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed">{saving ? 'Salvando...' : '✓ Salvar Alterações'}</button>
           </div>
         </form>
-
-        {/* Footer */}
-        <div className="sticky bottom-0 bg-gray-900/95 backdrop-blur-lg border-t border-white/10 px-6 py-4">
-          <div className="flex gap-3 justify-end">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              className="px-6 py-3 bg-white/5 text-gray-300 rounded-lg hover:bg-white/10 transition-colors font-semibold disabled:opacity-50"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={loading}
-              className="px-6 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg hover:shadow-lg hover:shadow-orange-500/50 transition-all font-semibold disabled:opacity-50 flex items-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  Salvando...
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  Salvar Alterações
-                </>
-              )}
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );
