@@ -10,8 +10,7 @@ import {
   updateAchievement,
   deleteAchievement
 } from '../firebase/firestore';
-import { Calendar, Ruler, Weight, Edit } from 'lucide-react';
-import TimelineCarreira from '../components/TimelineCarreira';
+import { Calendar, Ruler, Weight, Edit, MapPin, Trophy, TrendingUp, Eye, Users, Award, Clock, Star } from 'lucide-react';
 import AdicionarCarreira from '../components/AdicionarCarreira';
 import EditarPerfilModal from '../components/EditarPerfilModal';
 import Sidebar from '../components/Sidebar';
@@ -32,12 +31,18 @@ export default function DashboardAtleta() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [modalAberto, setModalAberto] = useState<ModalType>(null);
   const [editData, setEditData] = useState<CareerExperience | Achievement | null>(null);
+  const [selectedClub, setSelectedClub] = useState<CareerExperience | null>(null);
 
   const loadProfile = async () => {
     if (currentUser) {
-      const profile = await getUserProfile(currentUser.uid);
-      setAtletaProfile(profile);
-      setLoading(false);
+      try {
+        const profile = await getUserProfile(currentUser.uid);
+        setAtletaProfile(profile);
+        setLoading(false);
+      } catch (error) {
+        console.error('Erro ao carregar perfil:', error);
+        setLoading(false);
+      }
     }
   };
 
@@ -111,6 +116,18 @@ export default function DashboardAtleta() {
     setModalAberto('achievement');
   };
 
+  const calcularIdade = () => {
+    if (!atletaProfile?.birthDate) return null;
+    const hoje = new Date();
+    const nascimento = new Date(atletaProfile.birthDate);
+    let idade = hoje.getFullYear() - nascimento.getFullYear();
+    const mes = hoje.getMonth() - nascimento.getMonth();
+    if (mes < 0 || (mes === 0 && hoje.getDate() < nascimento.getDate())) {
+      idade--;
+    }
+    return idade;
+  };
+
   const calcularAnosCarreira = () => {
     if (!atletaProfile?.experiences || atletaProfile.experiences.length === 0) return 0;
     const experiencias = [...atletaProfile.experiences].sort((a, b) => a.startYear - b.startYear);
@@ -119,11 +136,24 @@ export default function DashboardAtleta() {
     return anoAtual - primeiroAno;
   };
 
+  const getClubAchievements = (clubName: string) => {
+    return atletaProfile?.achievements?.filter(ach => ach.club === clubName) || [];
+  };
+
+  const getCurrentClub = () => {
+    return atletaProfile?.experiences?.find(exp => exp.current);
+  };
+
   const totalClubes = atletaProfile?.experiences?.length || 0;
   const totalTitulos = atletaProfile?.achievements?.length || 0;
   const anosCarreira = calcularAnosCarreira();
+  const idade = calcularIdade();
+  const clubeAtual = getCurrentClub();
   const isProfileEmpty = totalClubes === 0 && totalTitulos === 0;
   const registeredClubs = atletaProfile?.experiences?.map(exp => exp.clubName) || [];
+
+  // Ordenar experiências por ano
+  const sortedExperiences = [...(atletaProfile?.experiences || [])].sort((a, b) => a.startYear - b.startYear);
 
   if (loading) {
     return (
@@ -151,7 +181,7 @@ export default function DashboardAtleta() {
           />
         )}
 
-        <main className="p-4 sm:p-6 lg:p-8">
+        <main className="p-4 sm:p-6 lg:p-8 mt-16">
           <div className="max-w-7xl mx-auto space-y-6">
             {activeSection === 'overview' && (
               <>
@@ -163,106 +193,370 @@ export default function DashboardAtleta() {
                   />
                 ) : (
                   <>
-                    <div className="bg-gradient-to-br from-gray-800/90 via-gray-800/80 to-gray-900/90 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-orange-500/20">
-                      <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center">
-                        <div className="relative">
-                          <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden border-4 border-orange-500/30 bg-gradient-to-br from-orange-500 to-red-600">
-                            {atletaProfile?.photoURL ? (
-                              <img src={atletaProfile.photoURL} alt={atletaProfile.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-white text-4xl sm:text-5xl font-bold">
-                                {atletaProfile?.name?.charAt(0).toUpperCase()}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex-1">
-                          <div className="flex items-start justify-between gap-4 mb-4">
-                            <div>
-                              <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">{atletaProfile?.name}</h1>
-                              <p className="text-orange-400 text-lg font-semibold">{atletaProfile?.position || 'Posição não definida'}</p>
+                    {/* HERO SECTION - Perfil Principal */}
+                    <div className="bg-gradient-to-br from-gray-800/90 via-gray-800/80 to-gray-900/90 backdrop-blur-sm rounded-2xl border border-gray-700/50 overflow-hidden">
+                      <div className="relative h-32 bg-gradient-to-r from-gray-800/50 to-gray-900/50">
+                        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjAzIiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-50"></div>
+                      </div>
+                      
+                      <div className="relative px-6 pb-6 -mt-16">
+                        <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-end">
+                          {/* Foto de Perfil */}
+                          <div className="relative group">
+                            <div className="w-32 h-32 rounded-2xl overflow-hidden border-4 border-gray-900 bg-gradient-to-br from-orange-500 to-red-600 shadow-2xl">
+                              {atletaProfile?.photoURL ? (
+                                <img src={atletaProfile.photoURL} alt={atletaProfile.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-white text-5xl font-bold">
+                                  {atletaProfile?.name?.charAt(0).toUpperCase()}
+                                </div>
+                              )}
                             </div>
-                            <button onClick={() => setModalAberto('editProfile')} className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
-                              <Edit size={18} />
-                              <span className="hidden sm:inline">Editar</span>
+                            {/* Botão Alterar Foto */}
+                            <button
+                              onClick={() => setModalAberto('editProfile')}
+                              className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Alterar foto"
+                            >
+                              <div className="text-center">
+                                <svg className="w-8 h-8 text-white mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                <span className="text-white text-xs font-medium">Alterar</span>
+                              </div>
                             </button>
-                          </div>
-
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                            {atletaProfile?.birthDate && (
-                              <div className="flex items-center gap-2 text-gray-300">
-                                <Calendar size={16} className="text-orange-400" />
-                                <span className="text-sm">{new Date(atletaProfile.birthDate).toLocaleDateString('pt-BR')}</span>
-                              </div>
-                            )}
-                            {atletaProfile?.height && (
-                              <div className="flex items-center gap-2 text-gray-300">
-                                <Ruler size={16} className="text-orange-400" />
-                                <span className="text-sm">{atletaProfile.height}cm</span>
-                              </div>
-                            )}
-                            {atletaProfile?.weight && (
-                              <div className="flex items-center gap-2 text-gray-300">
-                                <Weight size={16} className="text-orange-400" />
-                                <span className="text-sm">{atletaProfile.weight}kg</span>
+                            {clubeAtual && (
+                              <div className="absolute -bottom-2 -right-2 bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+                                ATIVO
                               </div>
                             )}
                           </div>
 
-                          {atletaProfile?.bio && (
-                            <p className="text-gray-400 mt-4 leading-relaxed">{atletaProfile.bio}</p>
-                          )}
+                          {/* Informações Principais */}
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between gap-4 mb-3">
+                              <div>
+                                <h1 className="text-3xl sm:text-4xl font-bold text-white mb-1">{atletaProfile?.name}</h1>
+                                <div className="flex flex-wrap items-center gap-3 mb-2">
+                                  <span className="text-orange-400 text-lg font-semibold">{atletaProfile?.position || 'Posição não definida'}</span>
+                                  {idade && <span className="text-gray-400">• {idade} anos</span>}
+                                  {clubeAtual && (
+                                    <span className="bg-orange-500/20 text-orange-400 px-3 py-1 rounded-full text-sm font-medium border border-orange-500/30">
+                                      {clubeAtual.clubName}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <button 
+                                onClick={() => setModalAberto('editProfile')} 
+                                className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-all hover:scale-105"
+                              >
+                                <Edit size={18} />
+                                <span className="hidden sm:inline">Editar</span>
+                              </button>
+                            </div>
+
+                            {/* Stats Rápidos */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                              {atletaProfile?.height && (
+                                <div className="bg-gray-800/50 rounded-lg px-3 py-2 border border-gray-700/50">
+                                  <div className="flex items-center gap-2 text-gray-400 text-xs mb-1">
+                                    <Ruler size={14} />
+                                    <span>Altura</span>
+                                  </div>
+                                  <div className="text-white font-bold">{atletaProfile.height}cm</div>
+                                </div>
+                              )}
+                              {atletaProfile?.weight && (
+                                <div className="bg-gray-800/50 rounded-lg px-3 py-2 border border-gray-700/50">
+                                  <div className="flex items-center gap-2 text-gray-400 text-xs mb-1">
+                                    <Weight size={14} />
+                                    <span>Peso</span>
+                                  </div>
+                                  <div className="text-white font-bold">{atletaProfile.weight}kg</div>
+                                </div>
+                              )}
+                              {atletaProfile?.city && (
+                                <div className="bg-gray-800/50 rounded-lg px-3 py-2 border border-gray-700/50">
+                                  <div className="flex items-center gap-2 text-gray-400 text-xs mb-1">
+                                    <MapPin size={14} />
+                                    <span>Localização</span>
+                                  </div>
+                                  <div className="text-white font-bold text-sm">{atletaProfile.city}/{atletaProfile.state}</div>
+                                </div>
+                              )}
+                              <div className="bg-gray-800/50 rounded-lg px-3 py-2 border border-gray-700/50">
+                                <div className="flex items-center gap-2 text-gray-400 text-xs mb-1">
+                                  <Clock size={14} />
+                                  <span>Carreira</span>
+                                </div>
+                                <div className="text-white font-bold">{anosCarreira} anos</div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="bg-blue-500/10 backdrop-blur-sm rounded-xl p-6 border border-blue-500/20">
-                        <div className="text-4xl font-bold text-white mb-2">{totalClubes}</div>
-                        <div className="text-blue-200">Clubes</div>
-                      </div>
-                      <div className="bg-yellow-500/10 backdrop-blur-sm rounded-xl p-6 border border-yellow-500/20">
-                        <div className="text-4xl font-bold text-white mb-2">{totalTitulos}</div>
-                        <div className="text-yellow-200">Títulos</div>
-                      </div>
-                      <div className="bg-green-500/10 backdrop-blur-sm rounded-xl p-6 border border-green-500/20">
-                        <div className="text-4xl font-bold text-white mb-2">{anosCarreira}</div>
-                        <div className="text-green-200">Anos de Carreira</div>
-                      </div>
-                    </div>
-
-                    <div className="bg-gradient-to-br from-orange-500/10 to-orange-600/10 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-orange-500/30 hover:border-orange-500/50 transition-all">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-3">📅 Trajetória Profissional</h2>
-                          <p className="text-gray-300 mb-4">Confira sua história completa no vôlei: clubes, títulos e conquistas em uma timeline interativa.</p>
-                          <div className="flex gap-4 mb-4">
-                            <div className="flex items-center gap-2">
-                              <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center"><span className="text-xl">🏟️</span></div>
-                              <div>
-                                <div className="text-2xl font-bold text-white">{totalClubes}</div>
-                                <div className="text-sm text-gray-400">Clubes</div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center"><span className="text-xl">🏆</span></div>
-                              <div>
-                                <div className="text-2xl font-bold text-white">{totalTitulos}</div>
-                                <div className="text-sm text-gray-400">Títulos</div>
-                              </div>
-                            </div>
+                        {/* Bio */}
+                        {atletaProfile?.bio && (
+                          <div className="mt-4 p-4 bg-gray-800/30 rounded-lg border border-gray-700/30">
+                            <p className="text-gray-300 leading-relaxed">{atletaProfile.bio}</p>
                           </div>
-                          <button onClick={() => setActiveSection('trajetoria')} className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-medium transition-all hover:scale-105">
-                            <span>Ver Trajetória Completa</span>
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* ESTATÍSTICAS EM DESTAQUE */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/20 backdrop-blur-sm rounded-xl p-6 border border-blue-500/30">
+                        <div className="flex items-center justify-between mb-2">
+                          <Users className="w-8 h-8 text-blue-400" />
+                          <TrendingUp className="w-5 h-5 text-blue-400" />
+                        </div>
+                        <div className="text-3xl font-bold text-white mb-1">{totalClubes}</div>
+                        <div className="text-blue-200 text-sm">Clubes na Carreira</div>
+                      </div>
+
+                      <div className="bg-gradient-to-br from-yellow-500/20 to-yellow-600/20 backdrop-blur-sm rounded-xl p-6 border border-yellow-500/30">
+                        <div className="flex items-center justify-between mb-2">
+                          <Trophy className="w-8 h-8 text-yellow-400" />
+                          <Star className="w-5 h-5 text-yellow-400" />
+                        </div>
+                        <div className="text-3xl font-bold text-white mb-1">{totalTitulos}</div>
+                        <div className="text-yellow-200 text-sm">Títulos Conquistados</div>
+                      </div>
+
+                      <div className="bg-gradient-to-br from-green-500/20 to-green-600/20 backdrop-blur-sm rounded-xl p-6 border border-green-500/30">
+                        <div className="flex items-center justify-between mb-2">
+                          <Eye className="w-8 h-8 text-green-400" />
+                          <TrendingUp className="w-5 h-5 text-green-400" />
+                        </div>
+                        <div className="text-3xl font-bold text-white mb-1">245</div>
+                        <div className="text-green-200 text-sm">Visualizações do Perfil</div>
+                      </div>
+
+                      <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/20 backdrop-blur-sm rounded-xl p-6 border border-purple-500/30">
+                        <div className="flex items-center justify-between mb-2">
+                          <Award className="w-8 h-8 text-purple-400" />
+                          <Star className="w-5 h-5 text-purple-400" />
+                        </div>
+                        <div className="text-3xl font-bold text-white mb-1">12</div>
+                        <div className="text-purple-200 text-sm">Clubes Interessados</div>
+                      </div>
+                    </div>
+
+                    {/* TIMELINE HORIZONTAL */}
+                    <div className="bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-sm rounded-2xl p-6 border border-orange-500/20">
+                      <div className="flex items-center justify-between mb-6">
+                        <div>
+                          <h2 className="text-2xl font-bold text-white mb-1">📅 Linha do Tempo da Carreira</h2>
+                          <p className="text-gray-400 text-sm">Clique em um clube para ver as conquistas</p>
+                        </div>
+                        <button
+                          onClick={() => setActiveSection('trajetoria')}
+                          className="text-orange-400 hover:text-orange-300 text-sm font-medium transition-colors"
+                        >
+                          Ver detalhes →
+                        </button>
+                      </div>
+
+                      {sortedExperiences.length > 0 ? (
+                        <div className="relative">
+                          {/* Linha horizontal */}
+                          <div className="absolute left-0 right-0 top-12 h-0.5 bg-gradient-to-r from-orange-500/20 via-orange-500/50 to-orange-500/20"></div>
+
+                          {/* Cards dos clubes */}
+                          <div className="flex overflow-x-auto pb-4 gap-4 scrollbar-thin scrollbar-thumb-orange-500/50 scrollbar-track-gray-800">
+                            {sortedExperiences.map((exp, index) => {
+                              const achievements = getClubAchievements(exp.clubName);
+                              const isSelected = selectedClub?.id === exp.id;
+                              const isCurrent = exp.current;
+
+                              return (
+                                <div key={exp.id} className="flex-shrink-0 w-64">
+                                  <button
+                                    onClick={() => setSelectedClub(isSelected ? null : exp)}
+                                    className={`w-full text-left transition-all ${
+                                      isSelected ? 'scale-105' : 'hover:scale-102'
+                                    }`}
+                                  >
+                                    {/* Ano */}
+                                    <div className="text-center mb-3">
+                                      <div className="inline-block bg-orange-500/20 text-orange-400 px-4 py-1 rounded-full text-sm font-bold border border-orange-500/30">
+                                        {exp.startYear} {exp.endYear ? `- ${exp.endYear}` : '- Atual'}
+                                      </div>
+                                    </div>
+
+                                    {/* Card do Clube */}
+                                    <div className={`bg-gradient-to-br ${
+                                      isCurrent 
+                                        ? 'from-orange-500/20 to-orange-600/20 border-orange-500/50' 
+                                        : isSelected
+                                        ? 'from-blue-500/20 to-blue-600/20 border-blue-500/50'
+                                        : 'from-gray-700/50 to-gray-800/50 border-gray-600/30'
+                                    } backdrop-blur-sm rounded-xl p-4 border-2 relative overflow-hidden`}>
+                                      {isCurrent && (
+                                        <div className="absolute top-2 right-2">
+                                          <span className="bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded-full">ATUAL</span>
+                                        </div>
+                                      )}
+
+                                      <div className="mb-3">
+                                        <h3 className="text-white font-bold text-lg mb-1">{exp.clubName}</h3>
+                                        <p className="text-gray-400 text-sm">{exp.position}</p>
+                                      </div>
+
+                                      {achievements.length > 0 && (
+                                        <div className="flex items-center gap-2 text-yellow-400 text-sm">
+                                          <Trophy size={16} />
+                                          <span className="font-medium">{achievements.length} {achievements.length === 1 ? 'título' : 'títulos'}</span>
+                                        </div>
+                                      )}
+
+                                      {exp.description && (
+                                        <p className="text-gray-400 text-xs mt-2 line-clamp-2">{exp.description}</p>
+                                      )}
+                                    </div>
+                                  </button>
+
+                                  {/* Conquistas do clube selecionado */}
+                                  {isSelected && achievements.length > 0 && (
+                                    <div className="mt-4 space-y-2 animate-fadeIn">
+                                      {achievements.map((ach) => (
+                                        <div key={ach.id} className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+                                          <div className="flex items-start gap-2">
+                                            <Trophy size={16} className="text-yellow-400 flex-shrink-0 mt-0.5" />
+                                            <div className="flex-1 min-w-0">
+                                              <div className="text-white font-medium text-sm">{ach.championship}</div>
+                                              <div className="text-yellow-400 text-xs">{ach.year} • {ach.placement || ach.award}</div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-gray-400">
+                          Nenhuma experiência cadastrada ainda
+                        </div>
+                      )}
+                    </div>
+
+                    {/* DESTAQUES E CONQUISTAS */}
+                    {totalTitulos > 0 && (
+                      <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-600/10 backdrop-blur-sm rounded-2xl p-6 border border-yellow-500/20">
+                        <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                          <Star className="text-yellow-400" />
+                          Principais Conquistas
+                        </h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {atletaProfile?.achievements?.slice(0, 4).map((ach) => (
+                            <div key={ach.id} className="bg-gray-800/50 rounded-lg p-4 border border-yellow-500/20">
+                              <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                                  <Trophy className="text-yellow-400" size={20} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="text-white font-semibold mb-1">{ach.championship}</h3>
+                                  <p className="text-gray-400 text-sm">{ach.club} • {ach.year}</p>
+                                  {ach.placement && (
+                                    <span className="inline-block mt-2 bg-yellow-500/20 text-yellow-400 text-xs font-medium px-2 py-1 rounded">
+                                      {ach.placement}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {totalTitulos > 4 && (
+                          <button 
+                            onClick={() => setActiveSection('trajetoria')}
+                            className="w-full mt-4 text-yellow-400 hover:text-yellow-300 text-sm font-medium transition-colors"
+                          >
+                            Ver todos os {totalTitulos} títulos →
                           </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ÚLTIMAS ATIVIDADES */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {/* Quem viu seu perfil */}
+                      <div className="bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
+                        <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                          <Eye className="text-blue-400" size={20} />
+                          Visualizações Recentes
+                        </h3>
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg">
+                            <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
+                              MT
+                            </div>
+                            <div className="flex-1">
+                              <div className="text-white font-medium text-sm">Minas Tênis Clube</div>
+                              <div className="text-gray-400 text-xs">Há 2 horas</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg">
+                            <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white font-bold">
+                              SC
+                            </div>
+                            <div className="flex-1">
+                              <div className="text-white font-medium text-sm">Sada Cruzeiro</div>
+                              <div className="text-gray-400 text-xs">Há 5 horas</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg">
+                            <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center text-white font-bold">
+                              FL
+                            </div>
+                            <div className="flex-1">
+                              <div className="text-white font-medium text-sm">Flamengo</div>
+                              <div className="text-gray-400 text-xs">Ontem</div>
+                            </div>
+                          </div>
                         </div>
-                        <div className="hidden lg:block">
-                          <div className="w-32 h-32 bg-gradient-to-br from-orange-500/20 to-orange-600/20 rounded-full flex items-center justify-center">
-                            <span className="text-6xl">📖</span>
+                      </div>
+
+                      {/* Próximos passos */}
+                      <div className="bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50">
+                        <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                          <TrendingUp className="text-orange-400" size={20} />
+                          Próximos Passos
+                        </h3>
+                        <div className="space-y-3">
+                          <div className="flex items-start gap-3 p-3 bg-orange-500/10 rounded-lg border border-orange-500/20">
+                            <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                              1
+                            </div>
+                            <div>
+                              <div className="text-white font-medium text-sm">Adicione uma foto profissional</div>
+                              <div className="text-gray-400 text-xs mt-1">Perfis com foto têm 3x mais visualizações</div>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                            <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                              2
+                            </div>
+                            <div>
+                              <div className="text-white font-medium text-sm">Complete suas estatísticas</div>
+                              <div className="text-gray-400 text-xs mt-1">Dados técnicos atraem mais clubes</div>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3 p-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                            <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                              3
+                            </div>
+                            <div>
+                              <div className="text-white font-medium text-sm">Adicione vídeos de jogos</div>
+                              <div className="text-gray-400 text-xs mt-1">Mostre seu desempenho em ação</div>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -273,7 +567,6 @@ export default function DashboardAtleta() {
             )}
 
             {activeSection === 'statistics' && <StatisticsSection />}
-            
             {activeSection === 'trajetoria' && (
               <CarreiraTimeline
                 experiences={atletaProfile?.experiences || []}
@@ -282,9 +575,7 @@ export default function DashboardAtleta() {
                 onUpdate={loadProfile}
               />
             )}
-            
             {activeSection === 'achievements' && <BadgesSection />}
-
             {activeSection === 'profile' && (
               <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 border border-orange-500/20">
                 <h2 className="text-2xl font-bold text-white mb-6">Perfil Completo</h2>

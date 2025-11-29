@@ -223,8 +223,36 @@ export async function updateAtletaProfile(
 
 export async function addExperience(uid: string, experience: CareerExperience) {
   const userRef = doc(db, 'users', uid);
+  
+  // Buscar experiences atuais
+  const userDoc = await getDoc(userRef);
+  if (!userDoc.exists()) {
+    throw new Error('Usuário não encontrado');
+  }
+  
+  const userData = userDoc.data();
+  const currentExperiences = userData.experiences || [];
+  
+  // Garantir que tem ID único
+  const newExperience = {
+    ...experience,
+    id: experience.id || `experience_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  };
+  
+  // ✅ REMOVER CAMPOS UNDEFINED
+  const cleanExperience: CareerExperience = Object.keys(newExperience).reduce((acc, key) => {
+    const value = (newExperience as any)[key];
+    if (value !== undefined) {
+      (acc as any)[key] = value;
+    }
+    return acc;
+  }, {} as CareerExperience);
+  
+  // Adicionar ao array manualmente
+  const updatedExperiences = [...currentExperiences, cleanExperience];
+  
   await updateDoc(userRef, {
-    experiences: arrayUnion(experience),
+    experiences: updatedExperiences,
     updatedAt: Timestamp.now(),
   });
 }
@@ -236,32 +264,96 @@ export async function updateExperience(
 ) {
   const userRef = doc(db, 'users', uid);
   
-  await updateDoc(userRef, {
-    experiences: arrayRemove(oldExperience),
-  });
+  // Buscar experiences atuais
+  const userDoc = await getDoc(userRef);
+  if (!userDoc.exists()) {
+    throw new Error('Usuário não encontrado');
+  }
+  
+  const userData = userDoc.data();
+  const currentExperiences = userData.experiences || [];
+  
+  // ✅ REMOVER CAMPOS UNDEFINED
+  const cleanExperience: CareerExperience = Object.keys(newExperience).reduce((acc, key) => {
+    const value = (newExperience as any)[key];
+    if (value !== undefined) {
+      (acc as any)[key] = value;
+    }
+    return acc;
+  }, {} as CareerExperience);
+  
+  // Remover antiga e adicionar nova
+  const updatedExperiences = currentExperiences
+    .filter((exp: CareerExperience) => exp.id !== oldExperience.id)
+    .concat(cleanExperience);
   
   await updateDoc(userRef, {
-    experiences: arrayUnion(newExperience),
+    experiences: updatedExperiences,
     updatedAt: Timestamp.now(),
   });
 }
 
 export async function deleteExperience(uid: string, experience: CareerExperience) {
   const userRef = doc(db, 'users', uid);
+  
+  // Buscar experiences atuais
+  const userDoc = await getDoc(userRef);
+  if (!userDoc.exists()) {
+    throw new Error('Usuário não encontrado');
+  }
+  
+  const userData = userDoc.data();
+  const currentExperiences = userData.experiences || [];
+  
+  // Filtrar removendo a experience
+  const updatedExperiences = currentExperiences.filter(
+    (exp: CareerExperience) => exp.id !== experience.id
+  );
+  
   await updateDoc(userRef, {
-    experiences: arrayRemove(experience),
+    experiences: updatedExperiences,
     updatedAt: Timestamp.now(),
   });
 }
 
+// ✅ FUNÇÃO CORRIGIDA - addAchievement
 export async function addAchievement(uid: string, achievement: Achievement) {
   const userRef = doc(db, 'users', uid);
+  
+  // Buscar achievements atuais
+  const userDoc = await getDoc(userRef);
+  if (!userDoc.exists()) {
+    throw new Error('Usuário não encontrado');
+  }
+  
+  const userData = userDoc.data();
+  const currentAchievements = userData.achievements || [];
+  
+  // Garantir que tem ID único
+  const newAchievement = {
+    ...achievement,
+    id: achievement.id || `achievement_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  };
+  
+  // ✅ REMOVER CAMPOS UNDEFINED (Firestore não aceita)
+  const cleanAchievement: Achievement = Object.keys(newAchievement).reduce((acc, key) => {
+    const value = (newAchievement as any)[key];
+    if (value !== undefined) {
+      (acc as any)[key] = value;
+    }
+    return acc;
+  }, {} as Achievement);
+  
+  // Adicionar ao array manualmente (NÃO usar arrayUnion!)
+  const updatedAchievements = [...currentAchievements, cleanAchievement];
+  
   await updateDoc(userRef, {
-    achievements: arrayUnion(achievement),
+    achievements: updatedAchievements,
     updatedAt: Timestamp.now(),
   });
 }
 
+// ✅ FUNÇÃO CORRIGIDA - updateAchievement
 export async function updateAchievement(
   uid: string,
   oldAchievement: Achievement,
@@ -269,20 +361,55 @@ export async function updateAchievement(
 ) {
   const userRef = doc(db, 'users', uid);
   
-  await updateDoc(userRef, {
-    achievements: arrayRemove(oldAchievement),
-  });
+  // Buscar achievements atuais
+  const userDoc = await getDoc(userRef);
+  if (!userDoc.exists()) {
+    throw new Error('Usuário não encontrado');
+  }
+  
+  const userData = userDoc.data();
+  const currentAchievements = userData.achievements || [];
+  
+  // ✅ REMOVER CAMPOS UNDEFINED
+  const cleanAchievement: Achievement = Object.keys(newAchievement).reduce((acc, key) => {
+    const value = (newAchievement as any)[key];
+    if (value !== undefined) {
+      (acc as any)[key] = value;
+    }
+    return acc;
+  }, {} as Achievement);
+  
+  // Remover antigo e adicionar novo
+  const updatedAchievements = currentAchievements
+    .filter((ach: Achievement) => ach.id !== oldAchievement.id)
+    .concat(cleanAchievement);
   
   await updateDoc(userRef, {
-    achievements: arrayUnion(newAchievement),
+    achievements: updatedAchievements,
     updatedAt: Timestamp.now(),
   });
 }
 
+// ✅ FUNÇÃO CORRIGIDA - deleteAchievement
 export async function deleteAchievement(uid: string, achievement: Achievement) {
   const userRef = doc(db, 'users', uid);
+  
+  // Buscar achievements atuais
+  const userDoc = await getDoc(userRef);
+  if (!userDoc.exists()) {
+    throw new Error('Usuário não encontrado');
+  }
+  
+  const userData = userDoc.data();
+  const currentAchievements = userData.achievements || [];
+  
+  // Filtrar removendo o achievement
+  const updatedAchievements = currentAchievements.filter(
+    (ach: Achievement) => ach.id !== achievement.id
+  );
+  
   await updateDoc(userRef, {
-    achievements: arrayRemove(achievement),
+    achievements: updatedAchievements,
     updatedAt: Timestamp.now(),
   });
 }

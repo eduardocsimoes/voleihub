@@ -48,7 +48,7 @@ export default function DashboardAtleta() {
 
   useEffect(() => {
     loadProfile();
-  }, [currentUser?.uid]);  // ✅ CORRETO - só executa quando UID muda
+  }, [currentUser]);
 
   const handleSaveExperience = async (experience: CareerExperience) => {
     if (!currentUser) return;
@@ -194,15 +194,15 @@ export default function DashboardAtleta() {
                 ) : (
                   <>
                     {/* HERO SECTION - Perfil Principal */}
-                    <div className="bg-gradient-to-br from-gray-800/90 via-gray-800/80 to-gray-900/90 backdrop-blur-sm rounded-2xl border border-orange-500/20 overflow-hidden">
-                      <div className="relative h-32 bg-gradient-to-r from-orange-500/20 to-red-500/20">
+                    <div className="bg-gradient-to-br from-gray-800/90 via-gray-800/80 to-gray-900/90 backdrop-blur-sm rounded-2xl border border-gray-700/50 overflow-hidden">
+                      <div className="relative h-32 bg-gradient-to-r from-gray-800/50 to-gray-900/50">
                         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjAzIiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-50"></div>
                       </div>
                       
                       <div className="relative px-6 pb-6 -mt-16">
                         <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-end">
                           {/* Foto de Perfil */}
-                          <div className="relative">
+                          <div className="relative group">
                             <div className="w-32 h-32 rounded-2xl overflow-hidden border-4 border-gray-900 bg-gradient-to-br from-orange-500 to-red-600 shadow-2xl">
                               {atletaProfile?.photoURL ? (
                                 <img src={atletaProfile.photoURL} alt={atletaProfile.name} className="w-full h-full object-cover" />
@@ -212,6 +212,20 @@ export default function DashboardAtleta() {
                                 </div>
                               )}
                             </div>
+                            {/* Botão Alterar Foto */}
+                            <button
+                              onClick={() => setModalAberto('editProfile')}
+                              className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Alterar foto"
+                            >
+                              <div className="text-center">
+                                <svg className="w-8 h-8 text-white mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                <span className="text-white text-xs font-medium">Alterar</span>
+                              </div>
+                            </button>
                             {clubeAtual && (
                               <div className="absolute -bottom-2 -right-2 bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
                                 ATIVO

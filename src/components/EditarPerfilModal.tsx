@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
-import { X, User, Calendar, Ruler, Weight, MapPin, Phone, FileText } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, User, Calendar, Ruler, Weight, MapPin, Phone, FileText, Camera, Upload } from 'lucide-react';
 import { AtletaProfile, updateAtletaProfile } from '../firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../firebase/config';
 
 interface EditarPerfilModalProps {
   isOpen: boolean;
@@ -16,7 +18,12 @@ export default function EditarPerfilModal({
   onSuccess
 }: EditarPerfilModalProps) {
   const [loading, setLoading] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [formData, setFormData] = useState({
     name: '',
     position: '',
@@ -26,7 +33,8 @@ export default function EditarPerfilModal({
     city: '',
     state: '',
     phone: '',
-    bio: ''
+    bio: '',
+    photoURL: ''
   });
 
   useEffect(() => {
@@ -40,8 +48,11 @@ export default function EditarPerfilModal({
         city: atletaProfile.city || '',
         state: atletaProfile.state || '',
         phone: atletaProfile.phone || '',
-        bio: atletaProfile.bio || ''
+        bio: atletaProfile.bio || '',
+        photoURL: atletaProfile.photoURL || ''
       });
+      setPhotoPreview(atletaProfile.photoURL || null);
+      setPhotoFile(null);
       setSuccessMessage('');
     }
   }, [isOpen, atletaProfile]);
@@ -56,12 +67,72 @@ export default function EditarPerfilModal({
     }
   };
 
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo de arquivo
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecione uma imagem válida');
+      return;
+    }
+
+    // Validar tamanho (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('A imagem deve ter no máximo 5MB');
+      return;
+    }
+
+    setPhotoFile(file);
+    
+    // Preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPhotoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const uploadPhoto = async (): Promise<string | null> => {
+    if (!photoFile) return formData.photoURL || null;
+
+    try {
+      setUploadingPhoto(true);
+      
+      // Criar referência no Storage
+      const storageRef = ref(storage, `profile-photos/${atletaProfile.uid}/${Date.now()}_${photoFile.name}`);
+      
+      // Upload
+      await uploadBytes(storageRef, photoFile);
+      
+      // Obter URL
+      const downloadURL = await getDownloadURL(storageRef);
+      
+      return downloadURL;
+    } catch (error) {
+      console.error('Erro ao fazer upload da foto:', error);
+      alert('Erro ao fazer upload da foto. Tente novamente.');
+      return null;
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setSuccessMessage('');
 
     try {
+      // Upload da foto (se houver)
+      let photoURL = formData.photoURL;
+      if (photoFile) {
+        const uploadedURL = await uploadPhoto();
+        if (uploadedURL) {
+          photoURL = uploadedURL;
+        }
+      }
+
       const updatedProfile: Partial<AtletaProfile> = {
         name: formData.name,
         position: formData.position,
@@ -71,7 +142,8 @@ export default function EditarPerfilModal({
         city: formData.city,
         state: formData.state,
         phone: formData.phone,
-        bio: formData.bio
+        bio: formData.bio,
+        photoURL: photoURL
       };
 
       await updateAtletaProfile(atletaProfile.uid, updatedProfile);
@@ -118,7 +190,66 @@ export default function EditarPerfilModal({
         {/* Content */}
         <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(90vh-140px)] px-6 py-6">
           <div className="space-y-6">
-            {/* Informações Básicas */}
+            {/* Foto de Perfil */}
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6">
+              <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <Camera className="w-5 h-5 text-orange-500" />
+                Foto de Perfil
+              </h3>
+              
+              <div className="flex items-center gap-6">
+                {/* Preview da Foto */}
+                <div className="relative">
+                  <div className="w-32 h-32 rounded-2xl overflow-hidden border-4 border-gray-700 bg-gradient-to-br from-orange-500 to-red-600">
+                    {photoPreview ? (
+                      <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-white text-5xl font-bold">
+                        {formData.name?.charAt(0).toUpperCase() || 'A'}
+                      </div>
+                    )}
+                  </div>
+                  {photoFile && (
+                    <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                      Nova
+                    </div>
+                  )}
+                </div>
+
+                {/* Botões de Upload */}
+                <div className="flex-1">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoSelect}
+                    className="hidden"
+                  />
+                  
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition-all"
+                  >
+                    <Upload size={20} />
+                    <span>Escolher Foto</span>
+                  </button>
+                  
+                  <p className="text-gray-400 text-sm mt-2">
+                    Formatos: JPG, PNG, GIF (máx. 5MB)
+                  </p>
+                  
+                  {photoFile && (
+                    <p className="text-green-400 text-sm mt-2 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                      {photoFile.name}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Informações Pessoais */}
             <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 p-6">
               <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                 <User className="w-5 h-5 text-orange-500" />
@@ -149,14 +280,14 @@ export default function EditarPerfilModal({
                     name="position"
                     value={formData.position}
                     onChange={handleChange}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-orange-500 transition-colors"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-orange-500 transition-colors [&>option]:bg-gray-800 [&>option]:text-white"
                   >
-                    <option value="">Selecione</option>
-                    <option value="Levantador">Levantador</option>
-                    <option value="Oposto">Oposto</option>
-                    <option value="Central">Central</option>
-                    <option value="Ponteiro">Ponteiro</option>
-                    <option value="Líbero">Líbero</option>
+                    <option value="" className="bg-gray-800 text-white">Selecione</option>
+                    <option value="Levantador" className="bg-gray-800 text-white">Levantador</option>
+                    <option value="Oposto" className="bg-gray-800 text-white">Oposto</option>
+                    <option value="Central" className="bg-gray-800 text-white">Central</option>
+                    <option value="Ponteiro" className="bg-gray-800 text-white">Ponteiro</option>
+                    <option value="Líbero" className="bg-gray-800 text-white">Líbero</option>
                   </select>
                 </div>
 
@@ -306,20 +437,20 @@ export default function EditarPerfilModal({
             <button
               type="button"
               onClick={onClose}
-              disabled={loading}
+              disabled={loading || uploadingPhoto}
               className="px-6 py-3 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg font-semibold transition-colors disabled:opacity-50"
             >
               Cancelar
             </button>
             <button
               onClick={handleSubmit}
-              disabled={loading}
+              disabled={loading || uploadingPhoto}
               className="px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:shadow-lg hover:shadow-orange-500/50 text-white rounded-lg font-semibold transition-all disabled:opacity-50 flex items-center gap-2"
             >
-              {loading ? (
+              {loading || uploadingPhoto ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  Salvando...
+                  {uploadingPhoto ? 'Enviando foto...' : 'Salvando...'}
                 </>
               ) : (
                 'Salvar Alterações'
