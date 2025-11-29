@@ -20,6 +20,7 @@ import BadgesSection from '../components/BadgesSection';
 import StatisticsSection from '../components/StatisticsSection';
 import EmptyState from '../components/EmptyState';
 import CarreiraTimeline from '../components/CarreiraTimeline';
+import TimelineHorizontal from '../components/TimelineHorizontal';
 
 type ModalType = 'experience' | 'achievement' | 'editProfile' | null;
 
@@ -568,12 +569,31 @@ export default function DashboardAtleta() {
 
             {activeSection === 'statistics' && <StatisticsSection />}
             {activeSection === 'trajetoria' && (
-              <CarreiraTimeline
-                experiences={atletaProfile?.experiences || []}
-                achievements={atletaProfile?.achievements || []}
-                userId={currentUser?.uid || ''}
-                onUpdate={loadProfile}
-              />
+              <div className="space-y-6">
+                {/* Botões de Ação */}
+                <div className="flex flex-wrap gap-3 justify-end">
+                  <button
+                    onClick={() => setModalAberto('experience')}
+                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-600 hover:shadow-lg hover:shadow-blue-500/50 text-white rounded-xl font-semibold transition-all"
+                  >
+                    <span className="text-xl">+</span>
+                    Adicionar Clube
+                  </button>
+                  <button
+                    onClick={() => setModalAberto('achievement')}
+                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-yellow-500 to-orange-600 hover:shadow-lg hover:shadow-yellow-500/50 text-white rounded-xl font-semibold transition-all"
+                  >
+                    <span className="text-xl">+</span>
+                    Adicionar Título
+                  </button>
+                </div>
+                
+                {/* Timeline Horizontal */}
+                <TimelineHorizontal
+                  experiences={atletaProfile?.experiences || []}
+                  achievements={atletaProfile?.achievements || []}
+                />
+              </div>
             )}
             {activeSection === 'achievements' && <BadgesSection />}
             {activeSection === 'profile' && (
