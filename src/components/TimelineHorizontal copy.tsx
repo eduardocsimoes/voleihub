@@ -1,14 +1,10 @@
-import React, { useState } from 'react';
-import { Building2, Trophy, Calendar, Edit2, Trash2 } from 'lucide-react';
+import React from 'react';
+import { Building2, Trophy, Calendar } from 'lucide-react';
 import type { CareerExperience, Achievement } from '../firebase/firestore';
 
 interface TimelineHorizontalProps {
   experiences: CareerExperience[];
   achievements: Achievement[];
-  onEditClub?: (club: CareerExperience) => void;
-  onDeleteClub?: (club: CareerExperience) => void;
-  onEditAchievement?: (achievement: Achievement) => void;
-  onDeleteAchievement?: (achievement: Achievement) => void;
 }
 
 type TimelineItem = {
@@ -18,16 +14,7 @@ type TimelineItem = {
   achievement?: Achievement;
 };
 
-export default function TimelineHorizontal({ 
-  experiences, 
-  achievements,
-  onEditClub,
-  onDeleteClub,
-  onEditAchievement,
-  onDeleteAchievement
-}: TimelineHorizontalProps) {
-  
-  const [confirmDelete, setConfirmDelete] = useState<{type: 'club' | 'achievement', id: string} | null>(null);
+export default function TimelineHorizontal({ experiences, achievements }: TimelineHorizontalProps) {
   
   // Criar linha do tempo contínua
   const createContinuousTimeline = (): TimelineItem[] => {
@@ -37,7 +24,7 @@ export default function TimelineHorizontal({
     const yearsSet = new Set<number>();
     
     // Adicionar anos dos clubes (todos os anos entre startYear e endYear/atual)
-    experiences.forEach((exp: CareerExperience) => {
+    experiences.forEach(exp => {
       const endYear = exp.current ? new Date().getFullYear() : (exp.endYear || exp.startYear);
       for (let year = exp.startYear; year <= endYear; year++) {
         yearsSet.add(year);
@@ -45,7 +32,7 @@ export default function TimelineHorizontal({
     });
     
     // Adicionar anos dos títulos
-    achievements.forEach((ach: Achievement) => yearsSet.add(ach.year));
+    achievements.forEach(ach => yearsSet.add(ach.year));
     
     // Ordenar DECRESCENTE (mais novo primeiro)
     const years = Array.from(yearsSet).sort((a, b) => b - a);
@@ -104,25 +91,6 @@ export default function TimelineHorizontal({
     }
   };
   
-  // Confirmar exclusão de clube
-  const handleConfirmDeleteClub = (club: CareerExperience) => {
-    const titlesCount = achievements.filter(a => a.club === club.clubName).length;
-    const message = titlesCount > 0 
-      ? `Tem certeza que deseja excluir o clube "${club.clubName}"?\n\n⚠️ ATENÇÃO: ${titlesCount} título(s) vinculado(s) a este clube também será(ão) excluído(s)!`
-      : `Tem certeza que deseja excluir o clube "${club.clubName}"?`;
-    
-    if (window.confirm(message)) {
-      onDeleteClub?.(club);
-    }
-  };
-  
-  // Confirmar exclusão de título
-  const handleConfirmDeleteAchievement = (achievement: Achievement) => {
-    if (window.confirm(`Tem certeza que deseja excluir o título "${achievement.championship}"?`)) {
-      onDeleteAchievement?.(achievement);
-    }
-  };
-  
   if (experiences.length === 0 && achievements.length === 0) {
     return (
       <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-2xl p-12 border border-gray-700/50 text-center">
@@ -173,34 +141,12 @@ export default function TimelineHorizontal({
                   const endYear = club.current ? new Date().getFullYear() : (club.endYear || club.startYear);
                   
                   return (
-                    <div key={`club-${club.id}-${currentYear}`} className="flex-shrink-0 flex flex-col items-center group/card" style={{ width: '140px' }}>
+                    <div key={`club-${club.id}-${currentYear}`} className="flex-shrink-0 flex flex-col items-center" style={{ width: '140px' }}>
                       {/* Ponto na linha */}
                       <div className="relative z-10 w-4 h-4 rounded-full bg-blue-500 border-4 border-gray-900 shadow-lg shadow-blue-500/50 mb-2"></div>
                       
                       {/* Card compacto */}
-                      <div className="w-full bg-gradient-to-br from-blue-500/10 to-blue-600/10 backdrop-blur-sm rounded-lg p-3 border border-blue-500/30 hover:border-blue-500/60 transition-all shadow-lg relative">
-                        {/* Botões de ação (aparecem no hover) */}
-                        <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity z-20">
-                          {onEditClub && (
-                            <button
-                              onClick={() => onEditClub(club)}
-                              className="p-1 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
-                              title="Editar clube"
-                            >
-                              <Edit2 className="w-3 h-3" />
-                            </button>
-                          )}
-                          {onDeleteClub && (
-                            <button
-                              onClick={() => handleConfirmDeleteClub(club)}
-                              className="p-1 bg-red-500 hover:bg-red-600 text-white rounded transition-colors"
-                              title="Excluir clube"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
-                        
+                      <div className="w-full bg-gradient-to-br from-blue-500/10 to-blue-600/10 backdrop-blur-sm rounded-lg p-3 border border-blue-500/30 hover:border-blue-500/60 transition-all hover:scale-105 shadow-lg">
                         <div className="flex items-center gap-2 mb-2">
                           <div className="w-6 h-6 bg-blue-500/20 rounded flex items-center justify-center flex-shrink-0">
                             <Building2 className="w-3 h-3 text-blue-400" />
@@ -232,34 +178,12 @@ export default function TimelineHorizontal({
                   // Card de Título (COMPACTO)
                   const achievement = item.achievement!;
                   return (
-                    <div key={`achievement-${achievement.id}`} className="flex-shrink-0 flex flex-col items-center group/card" style={{ width: '140px' }}>
+                    <div key={`achievement-${achievement.id}`} className="flex-shrink-0 flex flex-col items-center" style={{ width: '140px' }}>
                       {/* Ponto na linha */}
                       <div className="relative z-10 w-4 h-4 rounded-full bg-yellow-500 border-4 border-gray-900 shadow-lg shadow-yellow-500/50 mb-2"></div>
                       
                       {/* Card compacto */}
-                      <div className="w-full bg-gradient-to-br from-yellow-500/10 to-orange-600/10 backdrop-blur-sm rounded-lg p-3 border border-yellow-500/30 hover:border-yellow-500/60 transition-all shadow-lg relative">
-                        {/* Botões de ação (aparecem no hover) */}
-                        <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity z-20">
-                          {onEditAchievement && (
-                            <button
-                              onClick={() => onEditAchievement(achievement)}
-                              className="p-1 bg-yellow-500 hover:bg-yellow-600 text-white rounded transition-colors"
-                              title="Editar título"
-                            >
-                              <Edit2 className="w-3 h-3" />
-                            </button>
-                          )}
-                          {onDeleteAchievement && (
-                            <button
-                              onClick={() => handleConfirmDeleteAchievement(achievement)}
-                              className="p-1 bg-red-500 hover:bg-red-600 text-white rounded transition-colors"
-                              title="Excluir título"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
-                        
+                      <div className="w-full bg-gradient-to-br from-yellow-500/10 to-orange-600/10 backdrop-blur-sm rounded-lg p-3 border border-yellow-500/30 hover:border-yellow-500/60 transition-all hover:scale-105 shadow-lg">
                         <div className="flex items-center gap-2 mb-2">
                           <div className="w-6 h-6 bg-yellow-500/20 rounded flex items-center justify-center flex-shrink-0">
                             <Trophy className="w-3 h-3 text-yellow-400" />
@@ -325,7 +249,7 @@ export default function TimelineHorizontal({
           <div className="text-3xl font-bold text-green-400">
             {(() => {
               const yearsSet = new Set<number>();
-              experiences.forEach((exp: CareerExperience) => {
+              experiences.forEach(exp => {
                 const endYear = exp.current ? new Date().getFullYear() : (exp.endYear || exp.startYear);
                 for (let year = exp.startYear; year <= endYear; year++) {
                   yearsSet.add(year);
@@ -347,4 +271,3 @@ export default function TimelineHorizontal({
     </div>
   );
 }
-  

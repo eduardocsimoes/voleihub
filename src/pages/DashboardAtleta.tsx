@@ -72,7 +72,33 @@ export default function DashboardAtleta() {
     const experience = atletaProfile.experiences?.find(exp => exp.id === id);
     if (!experience) return;
     try {
+      // Deletar experiência
       await deleteExperience(currentUser.uid, experience);
+      
+      // Deletar TODOS os títulos vinculados a este clube
+      const titlesFromClub = atletaProfile.achievements?.filter(ach => ach.club === experience.clubName) || [];
+      for (const achievement of titlesFromClub) {
+        await deleteAchievement(currentUser.uid, achievement);
+      }
+      
+      await loadProfile();
+    } catch (error) {
+      console.error('Erro ao deletar experiência:', error);
+    }
+  };
+
+  const handleDeleteExperienceFromTimeline = async (experience: CareerExperience) => {
+    if (!currentUser || !atletaProfile) return;
+    try {
+      // Deletar experiência
+      await deleteExperience(currentUser.uid, experience);
+      
+      // Deletar TODOS os títulos vinculados a este clube
+      const titlesFromClub = atletaProfile.achievements?.filter(ach => ach.club === experience.clubName) || [];
+      for (const achievement of titlesFromClub) {
+        await deleteAchievement(currentUser.uid, achievement);
+      }
+      
       await loadProfile();
     } catch (error) {
       console.error('Erro ao deletar experiência:', error);
@@ -104,6 +130,16 @@ export default function DashboardAtleta() {
     if (!currentUser || !atletaProfile) return;
     const achievement = atletaProfile.achievements?.find(ach => ach.id === id);
     if (!achievement) return;
+    try {
+      await deleteAchievement(currentUser.uid, achievement);
+      await loadProfile();
+    } catch (error) {
+      console.error('Erro ao deletar conquista:', error);
+    }
+  };
+
+  const handleDeleteAchievementFromTimeline = async (achievement: Achievement) => {
+    if (!currentUser) return;
     try {
       await deleteAchievement(currentUser.uid, achievement);
       await loadProfile();
@@ -592,6 +628,10 @@ export default function DashboardAtleta() {
                 <TimelineHorizontal
                   experiences={atletaProfile?.experiences || []}
                   achievements={atletaProfile?.achievements || []}
+                  onEditClub={handleEditExperience}
+                  onDeleteClub={handleDeleteExperienceFromTimeline}
+                  onEditAchievement={handleEditAchievement}
+                  onDeleteAchievement={handleDeleteAchievementFromTimeline}
                 />
               </div>
             )}
