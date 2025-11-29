@@ -1,5 +1,31 @@
-import { getFirestore, doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { app } from './config';
+import { 
+  doc, 
+  setDoc, 
+  getDoc, 
+  updateDoc, 
+  arrayUnion, 
+  arrayRemove,
+  Timestamp 
+} from 'firebase/firestore';
+import { db } from './config';
+
+// ==================== TIPOS EXPORTADOS ====================
+
+export type ProfileType = 'atleta' | 'clube' | 'treinador' | 'agente' | 'patrocinador';
+
+// ==================== TIPOS BASE ====================
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  name: string;
+  userType: ProfileType;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  onboardingCompleted?: boolean;
+}
+
+// ==================== TIPOS PARA ATLETA ====================
 
 export interface CareerExperience {
   id: string;
@@ -13,211 +39,45 @@ export interface CareerExperience {
 
 export interface Achievement {
   id: string;
-  championship: string;
-  year: number;
-  club: string;
   type: 'Coletivo' | 'Individual';
+  championship: string;
+  club: string;
+  year: number;
   placement?: '1º Lugar' | '2º Lugar' | '3º Lugar' | 'Participante';
-  award?: 'MVP' | 'Melhor Ponteiro' | 'Melhor Levantador' | 'Melhor Central' | 
-          'Melhor Líbero' | 'Melhor Oposto' | 'Melhor Sacador' | 
-          'Melhor Bloqueador' | 'Destaque' | 'Revelação';
+  award?: string;
 }
-
-export interface Result<T = void> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
-
-export const db = getFirestore(app);
-
-export type ProfileType = 'atleta' | 'clube' | 'treinador' | 'agente' | 'patrocinador';
-
-export interface UserProfile {
-  uid: string;
-  email: string;
-  displayName: string;
-  profileType: ProfileType;
-  createdAt: any;
-  onboardingCompleted: boolean;
-  photoURL?: string;
-  avatar?: string;
-}
-
-export const createUserProfile = async (
-  uid: string,
-  email: string,
-  displayName: string,
-  profileType: ProfileType
-) => {
-  try {
-    const userRef = doc(db, 'users', uid);
-    
-    const userData: UserProfile = {
-      uid,
-      email,
-      displayName,
-      profileType,
-      createdAt: serverTimestamp(),
-      onboardingCompleted: false,
-    };
-
-    await setDoc(userRef, userData);
-
-    switch (profileType) {
-      case 'atleta':
-        await createAtletaProfile(uid, email, displayName);
-        break;
-      case 'clube':
-        await createClubeProfile(uid);
-        break;
-      case 'treinador':
-        await createTreinadorProfile(uid);
-        break;
-      case 'agente':
-        await createAgenteProfile(uid);
-        break;
-      case 'patrocinador':
-        await createPatrocinadorProfile(uid);
-        break;
-    }
-
-    return { success: true, data: userData };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-};
-
-export const getUserProfile = async (uid: string) => {
-  try {
-    const userRef = doc(db, 'users', uid);
-    const userSnap = await getDoc(userRef);
-
-    if (userSnap.exists()) {
-      const userData = userSnap.data() as UserProfile;
-      
-      // Buscar dados específicos do perfil
-      if (userData.profileType === 'atleta') {
-        const atletaResult = await getAtletaProfile(uid);
-        if (atletaResult.success && atletaResult.data) {
-          return { success: true, data: { ...userData, ...atletaResult.data } as AtletaProfile };
-        }
-      }
-      
-      return { success: true, data: userData };
-    } else {
-      return { success: false, error: 'Usuário não encontrado' };
-    }
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-};
-
-export const updateUserProfile = async (uid: string, data: Partial<UserProfile>) => {
-  try {
-    const userRef = doc(db, 'users', uid);
-    await updateDoc(userRef, data);
-    
-    // Se for atleta, atualizar também o documento de atleta
-    const userSnap = await getDoc(userRef);
-    if (userSnap.exists()) {
-      const userData = userSnap.data() as UserProfile;
-      if (userData.profileType === 'atleta') {
-        const atletaRef = doc(db, 'atletas', uid);
-        await updateDoc(atletaRef, data);
-      }
-    }
-    
-    return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-};
-
-export const completeOnboarding = async (uid: string) => {
-  return updateUserProfile(uid, { onboardingCompleted: true });
-};
-
-// ========== ATLETA ==========
 
 export interface AtletaProfile extends UserProfile {
-  userId: string;
-  name: string;
-  email: string;
   photoURL?: string;
   position?: string;
+  birthDate?: string;
   height?: number;
   weight?: number;
-  birthDate?: string;
   city?: string;
   state?: string;
   phone?: string;
   bio?: string;
-  stats?: {
-    aces?: number;
-    blocks?: number;
-    attacks?: number;
-  };
-  videos?: string[];
-  achievements?: string[];
+  experiences?: CareerExperience[];
+  achievements?: Achievement[];
   seeking?: ('clube' | 'patrocinio' | 'treinador')[];
-  careerExperiences?: CareerExperience[];
-  careerAchievements?: Achievement[];
 }
 
-const createAtletaProfile = async (uid: string, email: string, name: string) => {
-  const atletaRef = doc(db, 'atletas', uid);
-  const atletaData: Partial<AtletaProfile> = {
-    userId: uid,
-    name: name,
-    email: email,
-    videos: [],
-    achievements: [],
-    seeking: [],
-    careerExperiences: [],
-    careerAchievements: [],
-  };
-  await setDoc(atletaRef, atletaData);
-};
+// ==================== TIPOS PARA CLUBE ====================
 
-export const getAtletaProfile = async (uid: string) => {
-  try {
-    const atletaRef = doc(db, 'atletas', uid);
-    const atletaSnap = await getDoc(atletaRef);
-
-    if (atletaSnap.exists()) {
-      return { success: true, data: atletaSnap.data() as AtletaProfile };
-    } else {
-      return { success: false, error: 'Perfil de atleta não encontrado' };
-    }
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-};
-
-export const updateAtletaProfile = async (uid: string, data: Partial<AtletaProfile>) => {
-  try {
-    const atletaRef = doc(db, 'atletas', uid);
-    await updateDoc(atletaRef, data);
-    return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-};
-
-// ========== CLUBE ==========
-
-export interface ClubeProfile {
-  userId: string;
+export interface ClubeProfile extends UserProfile {
+  clubName: string;
   photoURL?: string;
-  clubName?: string;
   foundedYear?: number;
-  category?: string;
   city?: string;
   state?: string;
+  category?: string;
+  division?: string;
+  description?: string;
   phone?: string;
   website?: string;
-  description?: string;
+  instagram?: string;
+  openPositions?: string[];
+  facilities?: string[];
   stats?: {
     athletes?: number;
     titles?: number;
@@ -227,218 +87,410 @@ export interface ClubeProfile {
   seeking?: ('atletas' | 'treinadores' | 'patrocinadores')[];
 }
 
-const createClubeProfile = async (uid: string) => {
-  const clubeRef = doc(db, 'clubes', uid);
-  const clubeData: ClubeProfile = {
-    userId: uid,
-  };
-  await setDoc(clubeRef, clubeData);
-};
+// ==================== TIPOS PARA TREINADOR ====================
 
-export async function getClubeProfile(userId: string): Promise<Result<ClubeProfile>> {
+export interface TreinadorProfile extends UserProfile {
+  specialty?: string;
+  experience?: string;
+  certifications?: string[];
+  city?: string;
+  state?: string;
+  phone?: string;
+  bio?: string;
+  seeking?: ('clube' | 'atletas')[];
+  yearsOfExperience?: number;
+  specialties?: string[];
+  mentorshipPrice?: number;
+  availability?: string;
+}
+
+// ==================== TIPOS PARA AGENTE ====================
+
+export interface AgenteProfile extends UserProfile {
+  company?: string;
+  athletes?: string[];
+  city?: string;
+  state?: string;
+  phone?: string;
+  bio?: string;
+  seeking?: ('atletas' | 'clubes')[];
+  yearsOfExperience?: number;
+  specialization?: string;
+  website?: string;
+}
+
+// ==================== TIPOS PARA PATROCINADOR ====================
+
+export interface PatrocinadorProfile extends UserProfile {
+  companyName: string;
+  brandName?: string;
+  segment?: string;
+  industry?: string;
+  description?: string;
+  city?: string;
+  state?: string;
+  phone?: string;
+  website?: string;
+  investmentRange?: string;
+  budget?: number;
+  interests?: string[];
+  seeking?: ('atletas' | 'clubes' | 'eventos')[];
+}
+
+// ==================== FUNÇÕES GERAIS ====================
+
+export async function completeOnboarding(uid: string) {
+  const userRef = doc(db, 'users', uid);
+  await updateDoc(userRef, {
+    onboardingCompleted: true,
+    updatedAt: Timestamp.now(),
+  });
+}
+
+// ==================== FUNÇÕES DE ATLETA ====================
+
+export async function createAtletaProfile(
+  uid: string,
+  email: string,
+  name: string,
+  additionalData: Partial<AtletaProfile> = {}
+) {
+  const atletaRef = doc(db, 'users', uid);
+  const atletaData: AtletaProfile = {
+    uid,
+    email,
+    name,
+    userType: 'atleta',
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+    onboardingCompleted: false,
+    experiences: [],
+    achievements: [],
+    ...additionalData,
+  };
+
+  await setDoc(atletaRef, atletaData);
+  return atletaData;
+}
+
+export async function getUserProfile(uid: string): Promise<AtletaProfile | null> {
   try {
-    const docRef = doc(db, 'clubes', userId);
-    const docSnap = await getDoc(docRef);
-    
-    if (docSnap.exists()) {
-      return { 
-        success: true, 
-        data: docSnap.data() as ClubeProfile 
-      };
+    const userRef = doc(db, 'users', uid);
+    const userSnap = await getDoc(userRef);
+
+    if (userSnap.exists()) {
+      const data = userSnap.data();
+      return {
+        uid: data.uid,
+        email: data.email,
+        name: data.name,
+        userType: data.userType,
+        photoURL: data.photoURL,
+        position: data.position,
+        birthDate: data.birthDate,
+        height: data.height,
+        weight: data.weight,
+        city: data.city,
+        state: data.state,
+        phone: data.phone,
+        bio: data.bio,
+        experiences: data.experiences || [],
+        achievements: data.achievements || [],
+        seeking: data.seeking || [],
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+        onboardingCompleted: data.onboardingCompleted,
+      } as AtletaProfile;
     }
-    
-    return { 
-      success: false, 
-      error: 'Perfil de clube não encontrado' 
-    };
-  } catch (error: any) {
-    console.error('❌ Erro ao buscar perfil de clube:', error);
-    return { 
-      success: false, 
-      error: error.message 
-    };
+
+    return null;
+  } catch (error) {
+    console.error('Erro ao buscar perfil:', error);
+    return null;
+  }
+}
+
+export async function updateAtletaProfile(
+  uid: string,
+  updates: Partial<AtletaProfile>
+) {
+  const userRef = doc(db, 'users', uid);
+  await updateDoc(userRef, {
+    ...updates,
+    updatedAt: Timestamp.now(),
+  });
+}
+
+export async function addExperience(uid: string, experience: CareerExperience) {
+  const userRef = doc(db, 'users', uid);
+  await updateDoc(userRef, {
+    experiences: arrayUnion(experience),
+    updatedAt: Timestamp.now(),
+  });
+}
+
+export async function updateExperience(
+  uid: string,
+  oldExperience: CareerExperience,
+  newExperience: CareerExperience
+) {
+  const userRef = doc(db, 'users', uid);
+  
+  await updateDoc(userRef, {
+    experiences: arrayRemove(oldExperience),
+  });
+  
+  await updateDoc(userRef, {
+    experiences: arrayUnion(newExperience),
+    updatedAt: Timestamp.now(),
+  });
+}
+
+export async function deleteExperience(uid: string, experience: CareerExperience) {
+  const userRef = doc(db, 'users', uid);
+  await updateDoc(userRef, {
+    experiences: arrayRemove(experience),
+    updatedAt: Timestamp.now(),
+  });
+}
+
+export async function addAchievement(uid: string, achievement: Achievement) {
+  const userRef = doc(db, 'users', uid);
+  await updateDoc(userRef, {
+    achievements: arrayUnion(achievement),
+    updatedAt: Timestamp.now(),
+  });
+}
+
+export async function updateAchievement(
+  uid: string,
+  oldAchievement: Achievement,
+  newAchievement: Achievement
+) {
+  const userRef = doc(db, 'users', uid);
+  
+  await updateDoc(userRef, {
+    achievements: arrayRemove(oldAchievement),
+  });
+  
+  await updateDoc(userRef, {
+    achievements: arrayUnion(newAchievement),
+    updatedAt: Timestamp.now(),
+  });
+}
+
+export async function deleteAchievement(uid: string, achievement: Achievement) {
+  const userRef = doc(db, 'users', uid);
+  await updateDoc(userRef, {
+    achievements: arrayRemove(achievement),
+    updatedAt: Timestamp.now(),
+  });
+}
+
+// ==================== FUNÇÕES DE CLUBE ====================
+
+export async function createClubeProfile(
+  uid: string,
+  email: string,
+  name: string,
+  clubName: string,
+  additionalData: Partial<ClubeProfile> = {}
+) {
+  const clubeRef = doc(db, 'users', uid);
+  const clubeData: ClubeProfile = {
+    uid,
+    email,
+    name,
+    clubName,
+    userType: 'clube',
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+    onboardingCompleted: false,
+    ...additionalData,
+  };
+
+  await setDoc(clubeRef, clubeData);
+  return clubeData;
+}
+
+export async function getClubeProfile(uid: string): Promise<ClubeProfile | null> {
+  try {
+    const userRef = doc(db, 'users', uid);
+    const userSnap = await getDoc(userRef);
+
+    if (userSnap.exists()) {
+      return userSnap.data() as ClubeProfile;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Erro ao buscar perfil do clube:', error);
+    return null;
   }
 }
 
 export async function updateClubeProfile(
-  userId: string, 
-  data: Partial<ClubeProfile>
-): Promise<Result<void>> {
-  try {
-    const docRef = doc(db, 'clubes', userId);
-    await updateDoc(docRef, data as any);
-    
-    console.log('✅ Perfil de clube atualizado!');
-    return { success: true };
-  } catch (error: any) {
-    console.error('❌ Erro ao atualizar perfil de clube:', error);
-    return { 
-      success: false, 
-      error: error.message 
-    };
-  }
+  uid: string,
+  updates: Partial<ClubeProfile>
+) {
+  const userRef = doc(db, 'users', uid);
+  await updateDoc(userRef, {
+    ...updates,
+    updatedAt: Timestamp.now(),
+  });
 }
 
-// ========== TREINADOR ==========
+// ==================== FUNÇÕES DE TREINADOR ====================
 
-export interface TreinadorProfile {
-  userId: string;
-  photoURL?: string;
-  specialties?: string[];
-  experience?: string;
-  certifications?: string[];
-  courses?: {
-    id: string;
-    title: string;
-    price: number;
-    description: string;
-  }[];
-  mentorshipPrice?: number;
-  availability?: string;
-  city?: string;
-  state?: string;
-  phone?: string;
-  bio?: string;
-  yearsOfExperience?: number;
-}
-
-const createTreinadorProfile = async (uid: string) => {
-  const treinadorRef = doc(db, 'treinadores', uid);
+export async function createTreinadorProfile(
+  uid: string,
+  email: string,
+  name: string,
+  additionalData: Partial<TreinadorProfile> = {}
+) {
+  const treinadorRef = doc(db, 'users', uid);
   const treinadorData: TreinadorProfile = {
-    userId: uid,
-    specialties: [],
-    certifications: [],
-    courses: [],
+    uid,
+    email,
+    name,
+    userType: 'treinador',
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+    onboardingCompleted: false,
+    ...additionalData,
   };
+
   await setDoc(treinadorRef, treinadorData);
-};
-
-export const getTreinadorProfile = async (uid: string) => {
-  try {
-    const treinadorRef = doc(db, 'treinadores', uid);
-    const treinadorSnap = await getDoc(treinadorRef);
-
-    if (treinadorSnap.exists()) {
-      return { success: true, data: treinadorSnap.data() as TreinadorProfile };
-    } else {
-      return { success: false, error: 'Perfil de treinador não encontrado' };
-    }
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-};
-
-export const updateTreinadorProfile = async (uid: string, data: Partial<TreinadorProfile>) => {
-  try {
-    const treinadorRef = doc(db, 'treinadores', uid);
-    await updateDoc(treinadorRef, data);
-    return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-};
-
-// ========== AGENTE ==========
-
-export interface AgenteProfile {
-  userId: string;
-  photoURL?: string;
-  athletes?: string[];
-  clubs?: string[];
-  successfulDeals?: number;
-  specialization?: string;
-  city?: string;
-  state?: string;
-  phone?: string;
-  bio?: string;
-  yearsOfExperience?: number;
-  website?: string;
+  return treinadorData;
 }
 
-const createAgenteProfile = async (uid: string) => {
-  const agenteRef = doc(db, 'agentes', uid);
+export async function getTreinadorProfile(uid: string): Promise<TreinadorProfile | null> {
+  try {
+    const userRef = doc(db, 'users', uid);
+    const userSnap = await getDoc(userRef);
+
+    if (userSnap.exists()) {
+      return userSnap.data() as TreinadorProfile;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Erro ao buscar perfil do treinador:', error);
+    return null;
+  }
+}
+
+export async function updateTreinadorProfile(
+  uid: string,
+  updates: Partial<TreinadorProfile>
+) {
+  const userRef = doc(db, 'users', uid);
+  await updateDoc(userRef, {
+    ...updates,
+    updatedAt: Timestamp.now(),
+  });
+}
+
+// ==================== FUNÇÕES DE AGENTE ====================
+
+export async function createAgenteProfile(
+  uid: string,
+  email: string,
+  name: string,
+  additionalData: Partial<AgenteProfile> = {}
+) {
+  const agenteRef = doc(db, 'users', uid);
   const agenteData: AgenteProfile = {
-    userId: uid,
-    athletes: [],
-    clubs: [],
-    successfulDeals: 0,
+    uid,
+    email,
+    name,
+    userType: 'agente',
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+    onboardingCompleted: false,
+    ...additionalData,
   };
+
   await setDoc(agenteRef, agenteData);
-};
-
-export const getAgenteProfile = async (uid: string) => {
-  try {
-    const agenteRef = doc(db, 'agentes', uid);
-    const agenteSnap = await getDoc(agenteRef);
-
-    if (agenteSnap.exists()) {
-      return { success: true, data: agenteSnap.data() as AgenteProfile };
-    } else {
-      return { success: false, error: 'Perfil de agente não encontrado' };
-    }
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-};
-
-export const updateAgenteProfile = async (uid: string, data: Partial<AgenteProfile>) => {
-  try {
-    const agenteRef = doc(db, 'agentes', uid);
-    await updateDoc(agenteRef, data);
-    return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-};
-
-// ========== PATROCINADOR ==========
-
-export interface PatrocinadorProfile {
-  userId: string;
-  photoURL?: string;
-  brandName?: string;
-  industry?: string;
-  budget?: number;
-  interests?: string[];
-  currentSponsorships?: string[];
-  city?: string;
-  state?: string;
-  phone?: string;
-  website?: string;
-  description?: string;
+  return agenteData;
 }
 
-const createPatrocinadorProfile = async (uid: string) => {
-  const patrocinadorRef = doc(db, 'patrocinadores', uid);
-  const patrocinadorData: PatrocinadorProfile = {
-    userId: uid,
-    interests: [],
-    currentSponsorships: [],
-  };
-  await setDoc(patrocinadorRef, patrocinadorData);
-};
-
-export const getPatrocinadorProfile = async (uid: string) => {
+export async function getAgenteProfile(uid: string): Promise<AgenteProfile | null> {
   try {
-    const patrocinadorRef = doc(db, 'patrocinadores', uid);
-    const patrocinadorSnap = await getDoc(patrocinadorRef);
+    const userRef = doc(db, 'users', uid);
+    const userSnap = await getDoc(userRef);
 
-    if (patrocinadorSnap.exists()) {
-      return { success: true, data: patrocinadorSnap.data() as PatrocinadorProfile };
-    } else {
-      return { success: false, error: 'Perfil de patrocinador não encontrado' };
+    if (userSnap.exists()) {
+      return userSnap.data() as AgenteProfile;
     }
-  } catch (error: any) {
-    return { success: false, error: error.message };
-  }
-};
 
-export const updatePatrocinadorProfile = async (uid: string, data: Partial<PatrocinadorProfile>) => {
-  try {
-    const patrocinadorRef = doc(db, 'patrocinadores', uid);
-    await updateDoc(patrocinadorRef, data);
-    return { success: true };
-  } catch (error: any) {
-    return { success: false, error: error.message };
+    return null;
+  } catch (error) {
+    console.error('Erro ao buscar perfil do agente:', error);
+    return null;
   }
-};
+}
+
+export async function updateAgenteProfile(
+  uid: string,
+  updates: Partial<AgenteProfile>
+) {
+  const userRef = doc(db, 'users', uid);
+  await updateDoc(userRef, {
+    ...updates,
+    updatedAt: Timestamp.now(),
+  });
+}
+
+// ==================== FUNÇÕES DE PATROCINADOR ====================
+
+export async function createPatrocinadorProfile(
+  uid: string,
+  email: string,
+  name: string,
+  companyName: string,
+  additionalData: Partial<PatrocinadorProfile> = {}
+) {
+  const patrocinadorRef = doc(db, 'users', uid);
+  const patrocinadorData: PatrocinadorProfile = {
+    uid,
+    email,
+    name,
+    companyName,
+    userType: 'patrocinador',
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+    onboardingCompleted: false,
+    ...additionalData,
+  };
+
+  await setDoc(patrocinadorRef, patrocinadorData);
+  return patrocinadorData;
+}
+
+export async function getPatrocinadorProfile(uid: string): Promise<PatrocinadorProfile | null> {
+  try {
+    const userRef = doc(db, 'users', uid);
+    const userSnap = await getDoc(userRef);
+
+    if (userSnap.exists()) {
+      return userSnap.data() as PatrocinadorProfile;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Erro ao buscar perfil do patrocinador:', error);
+    return null;
+  }
+}
+
+export async function updatePatrocinadorProfile(
+  uid: string,
+  updates: Partial<PatrocinadorProfile>
+) {
+  const userRef = doc(db, 'users', uid);
+  await updateDoc(userRef, {
+    ...updates,
+    updatedAt: Timestamp.now(),
+  });
+}

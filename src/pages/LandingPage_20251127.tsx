@@ -4,7 +4,7 @@ import { Menu, X, Users, Target, TrendingUp, BookOpen, ShoppingBag, Award, Brief
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth } from '../firebase/config';
 import { logout } from '../firebase/auth';
-import { getUserProfile } from '../firebase/firestore_';
+import { getUserProfile } from '../firebase/firestore';
 import LoginModal from '../components/LoginModal';
 import RegisterModal from '../components/RegisterModal';
 import OnboardingRouter from '../components/OnboardingRouter';
@@ -25,7 +25,6 @@ export default function LandingPage() {
     const [showLoginModal, setShowLoginModal] = useState(false);
     const [showRegisterModal, setShowRegisterModal] = useState(false);
     const [scrolled, setScrolled] = useState(false);
-    const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set());
     const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
     const [onboardingCompleted, setOnboardingCompleted] = useState(false);
     const navigate = useNavigate();
@@ -47,8 +46,11 @@ export default function LandingPage() {
               setOnboardingCompleted(result.data.onboardingCompleted);
               console.log('🎯 onboardingCompleted:', result.data.onboardingCompleted);
               
-              // USUÁRIO CLICA NO BOTÃO "DASHBOARD" MANUALMENTE
-              // Não navegar automaticamente
+              // SE ONBOARDING COMPLETO, REDIRECIONAR PARA DASHBOARD
+              if (result.data.onboardingCompleted) {
+                console.log('🚀 Usuário com onboarding completo, redirecionando para dashboard...');
+                navigate('/dashboard');
+              }
             } else {
               console.error('❌ Erro ao buscar perfil:', result.error);
             }
@@ -64,29 +66,16 @@ export default function LandingPage() {
         };
       }, [navigate]);
   
+    // Scroll listener - CORRIGIDO SEM LOOP INFINITO
     useEffect(() => {
       const handleScroll = () => {
         setScrolled(window.scrollY > 50);
-  
-        // Detectar seções visíveis para animação
-        const sections = document.querySelectorAll('[data-animate]');
-        const newVisibleSections = new Set(visibleSections);
-  
-        sections.forEach((section) => {
-          const rect = section.getBoundingClientRect();
-          const isVisible = rect.top < window.innerHeight * 0.8;
-          if (isVisible) {
-            newVisibleSections.add(section.id);
-          }
-        });
-  
-        setVisibleSections(newVisibleSections);
       };
   
       window.addEventListener('scroll', handleScroll);
-      handleScroll(); // Check initial state
+      handleScroll();
       return () => window.removeEventListener('scroll', handleScroll);
-    }, [visibleSections]);
+    }, []); // ✅ Array vazio - sem dependências
   
     const handleLogout = async () => {
       const result = await logout();
@@ -244,7 +233,7 @@ export default function LandingPage() {
         }`}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-20">
-              <div className="flex items-center group cursor-pointer">
+              <div className="flex items-center group cursor-pointer" onClick={() => navigate('/')}>
                 <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center mr-3 transform group-hover:rotate-12 transition-all duration-300 group-hover:scale-110 shadow-lg group-hover:shadow-orange-500/50">
                   <Trophy className="w-7 h-7 text-white" />
                 </div>
@@ -263,13 +252,15 @@ export default function LandingPage() {
                     <span className="text-gray-400 text-sm">Olá, {currentUser.displayName || 'Usuário'}</span>
                     {onboardingCompleted && (
                       <button
-                        onClick={() => navigate('/dashboard')}
+                        onClick={() => {
+                          console.log('🔘 Navegando para /dashboard');
+                          navigate('/dashboard');
+                        }}
                         className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-orange-500/50 hover:scale-105 transition-all duration-300"
                       >
                         Dashboard
                       </button>
                     )}
-
                     <button 
                       onClick={handleLogout}
                       className="px-6 py-2.5 text-gray-300 hover:text-white transition-all duration-300 font-semibold hover:scale-105"
@@ -412,7 +403,7 @@ export default function LandingPage() {
         </section>
   
         {/* 4 Pilares */}
-        <section id="pilares" className="py-24 bg-gradient-to-b from-transparent to-gray-900/50" data-animate>
+        <section id="pilares" className="py-24 bg-gradient-to-b from-transparent to-gray-900/50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16 animate-fade-in-up">
               <h2 className="text-4xl md:text-5xl font-black mb-4">
@@ -442,7 +433,7 @@ export default function LandingPage() {
         </section>
   
         {/* Perfis Interativos */}
-        <section id="perfis" className="py-24" data-animate>
+        <section id="perfis" className="py-24">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16 animate-fade-in-up">
               <h2 className="text-4xl md:text-5xl font-black mb-4">
@@ -548,7 +539,7 @@ export default function LandingPage() {
         </section>
   
         {/* FAQ */}
-        <section id="faq" className="py-24" data-animate>
+        <section id="faq" className="py-24">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16 animate-fade-in-up">
               <h2 className="text-4xl md:text-5xl font-black mb-4">
@@ -793,4 +784,3 @@ export default function LandingPage() {
       </div>
     );
   }
-  

@@ -40,19 +40,18 @@ export default function LandingPage() {
           if (user) {
             console.log('👤 Usuário logado:', user.email);
             
-            const result = await getUserProfile(user.uid);
-            if (result.success && result.data) {
+            const profile = await getUserProfile(user.uid);
+            if (profile) {
               console.log('✅ Perfil encontrado');
-              setOnboardingCompleted(result.data.onboardingCompleted);
-              console.log('🎯 onboardingCompleted:', result.data.onboardingCompleted);
+              setOnboardingCompleted(profile.onboardingCompleted || false);
+              console.log('🎯 onboardingCompleted:', profile.onboardingCompleted);
               
-              // SE ONBOARDING COMPLETO, REDIRECIONAR PARA DASHBOARD
-              if (result.data.onboardingCompleted) {
+              if (profile.onboardingCompleted) {
                 console.log('🚀 Usuário com onboarding completo, redirecionando para dashboard...');
                 navigate('/dashboard');
               }
             } else {
-              console.error('❌ Erro ao buscar perfil:', result.error);
+              console.error('❌ Erro ao buscar perfil');
             }
           } else {
             console.log('❌ Nenhum usuário logado');
@@ -652,7 +651,7 @@ export default function LandingPage() {
         {/* Onboarding Router */}
         <OnboardingRouter />
   
-        <style jsx>{`
+        <style>{`
           @keyframes fade-in-up {
             from {
               opacity: 0;

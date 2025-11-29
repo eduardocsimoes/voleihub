@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { Camera, Upload, X, Check } from 'lucide-react';
 import { uploadProfilePhoto, resizeImage } from '../firebase/storage';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase/firestore';
+import { db } from '../firebase/config';
 
 interface UploadFotoPerfilProps {
   userId: string;
@@ -76,11 +76,13 @@ export default function UploadFotoPerfil({
         photoURL: result.url
       });
 
-      // Atualizar no Firestore (perfil específico)
-      const profileRef = doc(db, userType, userId);
-      await updateDoc(profileRef, {
-        photoURL: result.url
-      });
+      // Atualizar no Firestore (perfil específico se necessário)
+      if (userType !== 'users') {
+        const profileRef = doc(db, userType, userId);
+        await updateDoc(profileRef, {
+          photoURL: result.url
+        });
+      }
 
       console.log('✅ Foto atualizada com sucesso!');
       

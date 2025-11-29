@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase/config';
-import { getUserProfile, ProfileType } from '../firebase/firestore';
+import { getUserProfile } from '../firebase/firestore';
 import DashboardAtleta from './DashboardAtleta';
 import DashboardClube from './DashboardClube';
 import DashboardTreinador from './DashboardTreinador';
 import DashboardAgente from './DashboardAgente';
 import DashboardPatrocinador from './DashboardPatrocinador';
+
+type ProfileType = 'atleta' | 'clube' | 'treinador' | 'agente' | 'patrocinador';
 
 export default function DashboardRouter() {
   const [profileType, setProfileType] = useState<ProfileType | null>(null);
@@ -35,25 +37,27 @@ export default function DashboardRouter() {
 
       try {
         console.log('📋 Buscando perfil...');
-        const result = await getUserProfile(user.uid);
-        console.log('📋 Resultado:', result);
+        const profile = await getUserProfile(user.uid);
+        console.log('📋 Perfil retornado:', profile);
 
-        if (result.success && result.data) {
+        if (profile) {
           console.log('✅ Perfil encontrado!');
-          console.log('👥 profileType:', result.data.profileType);
-          console.log('🎯 onboardingCompleted:', result.data.onboardingCompleted);
+          console.log('👥 userType:', profile.userType);
 
-          if (!result.data.onboardingCompleted) {
-            console.log('⚠️ Onboarding não completo, redirecionando para /');
-            navigate('/');
+          // Verificar se tem userType
+          if (!profile.userType) {
+            console.error('❌ userType não definido no perfil');
+            setError('Tipo de perfil não definido');
+            setLoading(false);
             return;
           }
 
-          setProfileType(result.data.profileType);
+          // Definir o tipo de perfil baseado no userType
+          setProfileType(profile.userType as ProfileType);
           setError(null);
         } else {
-          console.error('❌ Erro ao buscar perfil:', result.error);
-          setError(result.error || 'Perfil não encontrado');
+          console.error('❌ Perfil não encontrado (retornou null)');
+          setError('Perfil não encontrado');
         }
       } catch (err: any) {
         console.error('❌ Exceção:', err);
@@ -75,6 +79,7 @@ export default function DashboardRouter() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
         <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-orange-500 mx-auto mb-4"></div>
           <div className="text-white text-2xl font-bold mb-4">Carregando dashboard...</div>
           <div className="text-gray-400 text-sm">Aguarde um momento</div>
         </div>

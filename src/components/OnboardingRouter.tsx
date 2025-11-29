@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase/config';
 import { getUserProfile, ProfileType } from '../firebase/firestore';
 import OnboardingAtleta from './OnboardingAtleta';
@@ -13,61 +14,137 @@ export default function OnboardingRouter() {
   const [userId, setUserId] = useState<string>('');
 
   useEffect(() => {
-    const checkOnboarding = async () => {
-      const user = auth.currentUser;
+    console.log('🟢 OnboardingRouter montado');
+    
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log('🔥 OnboardingRouter - onAuthStateChanged disparou');
+      console.log('👤 User:', user ? user.email : 'null');
       
       if (user) {
-        const result = await getUserProfile(user.uid);
+        console.log('📞 Buscando perfil para UID:', user.uid);
         
-        if (result.success && result.data) {
-          // Se onboarding não foi completado, mostrar
-          if (!result.data.onboardingCompleted) {
-            setShowOnboarding(true);
-            setProfileType(result.data.profileType);
-            setUserId(user.uid);
+        try {
+          const profile = await getUserProfile(user.uid);
+          console.log('📋 Perfil retornado:', profile);
+
+          if (profile) {
+            console.log('🎯 onboardingCompleted:', profile.onboardingCompleted);
+            console.log('👥 userType:', profile.userType);
+            
+            // VERIFICAR SE userType EXISTE
+            if (!profile.userType) {
+              console.error('❌ ERRO: userType não definido no perfil!');
+              console.log('🔧 Tentando detectar userType pelos campos...');
+              
+              // Tentar detectar pelo tipo de perfil
+              let detectedType: ProfileType | null = null;
+              
+              if ('clubName' in profile) {
+                detectedType = 'clube';
+                console.log('✅ Detectado tipo: clube (tem clubName)');
+              } else if ('position' in profile) {
+                detectedType = 'atleta';
+                console.log('✅ Detectado tipo: atleta (tem position)');
+              } else if ('specialty' in profile) {
+                detectedType = 'treinador';
+                console.log('✅ Detectado tipo: treinador (tem specialty)');
+              } else if ('company' in profile) {
+                detectedType = 'agente';
+                console.log('✅ Detectado tipo: agente (tem company)');
+              } else if ('companyName' in profile) {
+                detectedType = 'patrocinador';
+                console.log('✅ Detectado tipo: patrocinador (tem companyName)');
+              }
+              
+              if (detectedType) {
+                console.log('🔧 userType detectado:', detectedType);
+                setProfileType(detectedType);
+              } else {
+                console.error('❌ Não foi possível detectar o tipo de perfil!');
+                return;
+              }
+            } else {
+              setProfileType(profile.userType);
+            }
+            
+            // Verificar onboarding
+            if (!profile.onboardingCompleted) {
+              console.log('🚀 ABRINDO ONBOARDING MODAL!');
+              setShowOnboarding(true);
+              setUserId(user.uid);
+            } else {
+              console.log('✅ Onboarding já completado');
+              setShowOnboarding(false);
+            }
+          } else {
+            console.error('❌ Perfil não encontrado para UID:', user.uid);
           }
+        } catch (error) {
+          console.error('❌ Erro ao buscar perfil:', error);
         }
+      } else {
+        console.log('❌ Nenhum usuário autenticado');
+        setShowOnboarding(false);
+        setProfileType(null);
       }
-    };
-
-    // Verificar quando componente monta
-    checkOnboarding();
-
-    // Verificar também quando auth state muda
-    const unsubscribe = auth.onAuthStateChanged(() => {
-      checkOnboarding();
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log('🔴 OnboardingRouter desmontado');
+      unsubscribe();
+    };
   }, []);
 
-  const handleClose = () => {
-    // Não permitir fechar sem completar
-    const confirmed = window.confirm(
-      'Você precisa completar seu perfil para usar a plataforma. Deseja sair?'
-    );
-    
-    if (confirmed) {
-      setShowOnboarding(false);
-      auth.signOut();
-    }
-  };
+  console.log('🔍 OnboardingRouter render - showOnboarding:', showOnboarding, 'profileType:', profileType);
 
-  if (!showOnboarding || !profileType) return null;
-
-  // Renderizar o onboarding correto baseado no tipo de perfil
-  switch (profileType) {
-    case 'atleta':
-      return <OnboardingAtleta isOpen={showOnboarding} onClose={handleClose} userId={userId} />;
-    case 'clube':
-      return <OnboardingClube isOpen={showOnboarding} onClose={handleClose} userId={userId} />;
-    case 'treinador':
-      return <OnboardingTreinador isOpen={showOnboarding} onClose={handleClose} userId={userId} />;
-    case 'agente':
-      return <OnboardingAgente isOpen={showOnboarding} onClose={handleClose} userId={userId} />;
-    case 'patrocinador':
-      return <OnboardingPatrocinador isOpen={showOnboarding} onClose={handleClose} userId={userId} />;
-    default:
-      return null;
+  if (!showOnboarding || !profileType) {
+    console.log('⚠️ Não mostrando onboarding (showOnboarding:', showOnboarding, 'profileType:', profileType, ')');
+    return null;
   }
+
+  console.log('✅ Renderizando modal de onboarding para:', profileType);
+
+  return (
+    <>
+      {profileType === 'atleta' && (
+        <OnboardingAtleta
+          isOpen={true}
+          onClose={() => setShowOnboarding(false)}
+          userId={userId}
+        />
+      )}
+      
+      {profileType === 'clube' && (
+        <OnboardingClube
+          isOpen={true}
+          onClose={() => setShowOnboarding(false)}
+          userId={userId}
+        />
+      )}
+      
+      {profileType === 'treinador' && (
+        <OnboardingTreinador
+          isOpen={true}
+          onClose={() => setShowOnboarding(false)}
+          userId={userId}
+        />
+      )}
+      
+      {profileType === 'agente' && (
+        <OnboardingAgente
+          isOpen={true}
+          onClose={() => setShowOnboarding(false)}
+          userId={userId}
+        />
+      )}
+      
+      {profileType === 'patrocinador' && (
+        <OnboardingPatrocinador
+          isOpen={true}
+          onClose={() => setShowOnboarding(false)}
+          userId={userId}
+        />
+      )}
+    </>
+  );
 }
