@@ -1,5 +1,5 @@
 import React from 'react';
-import { Building2, Trophy, Calendar, MapPin, Award, Star } from 'lucide-react';
+import { Building2, Trophy, Calendar } from 'lucide-react';
 import type { CareerExperience, Achievement } from '../firebase/firestore';
 
 interface TimelineHorizontalProps {
@@ -7,75 +7,73 @@ interface TimelineHorizontalProps {
   achievements: Achievement[];
 }
 
-type TimelineEvent = {
-  type: 'club' | 'achievement';
-  year: number;
-  data: CareerExperience | Achievement;
-  order: number;
+type TimelineItem = {
+  type: 'year' | 'club' | 'achievement';
+  year?: number;
+  club?: CareerExperience;
+  achievement?: Achievement;
 };
 
 export default function TimelineHorizontal({ experiences, achievements }: TimelineHorizontalProps) {
   
-  // Função para criar eventos da timeline
-  const createTimelineEvents = (): { [year: number]: TimelineEvent[] } => {
-    const eventsByYear: { [year: number]: TimelineEvent[] } = {};
+  // Criar linha do tempo contínua
+  const createContinuousTimeline = (): TimelineItem[] => {
+    const timeline: TimelineItem[] = [];
     
-    // Adicionar clubes
-    experiences.forEach((exp, index) => {
-      const year = exp.startYear;
-      if (!eventsByYear[year]) {
-        eventsByYear[year] = [];
+    // Obter todos os anos únicos e ordenar DECRESCENTE (mais recente primeiro)
+    const yearsSet = new Set<number>();
+    
+    // Adicionar anos dos clubes (todos os anos entre startYear e endYear/atual)
+    experiences.forEach(exp => {
+      const endYear = exp.current ? new Date().getFullYear() : (exp.endYear || exp.startYear);
+      for (let year = exp.startYear; year <= endYear; year++) {
+        yearsSet.add(year);
       }
+    });
+    
+    // Adicionar anos dos títulos
+    achievements.forEach(ach => yearsSet.add(ach.year));
+    
+    // Ordenar DECRESCENTE (mais novo primeiro)
+    const years = Array.from(yearsSet).sort((a, b) => b - a);
+    
+    // Para cada ano, adicionar clubes e títulos
+    years.forEach(year => {
+      // Adicionar marcador de ano
+      timeline.push({ type: 'year', year });
       
-      eventsByYear[year].push({
-        type: 'club',
-        year,
-        data: exp,
-        order: index * 1000 // Clubes têm prioridade (multiplicador grande)
+      // Obter clubes ativos neste ano
+      const clubsThisYear = experiences
+        .filter(exp => {
+          const endYear = exp.current ? new Date().getFullYear() : (exp.endYear || exp.startYear);
+          return year >= exp.startYear && year <= endYear;
+        })
+        .sort((a, b) => {
+          // Ordenar por startYear (mais antigo primeiro dentro do ano)
+          if (a.startYear !== b.startYear) return a.startYear - b.startYear;
+          return a.id.localeCompare(b.id);
+        });
+      
+      // Para cada clube ativo neste ano
+      clubsThisYear.forEach(club => {
+        // Adicionar clube
+        timeline.push({ type: 'club', club, year });
+        
+        // Adicionar títulos DESTE clube NESTE ano
+        const titlesThisClubThisYear = achievements
+          .filter(ach => ach.club === club.clubName && ach.year === year)
+          .sort((a, b) => a.id.localeCompare(b.id));
+        
+        titlesThisClubThisYear.forEach(achievement => {
+          timeline.push({ type: 'achievement', achievement });
+        });
       });
     });
     
-    // Adicionar títulos APÓS o clube correspondente
-    achievements.forEach((ach) => {
-      const year = ach.year;
-      if (!eventsByYear[year]) {
-        eventsByYear[year] = [];
-      }
-      
-      // Encontrar o clube correspondente no mesmo ano
-      const clubIndex = eventsByYear[year].findIndex(
-        event => event.type === 'club' && 
-        (event.data as CareerExperience).clubName === ach.club
-      );
-      
-      // Order: se encontrou clube, coloca logo após (clubIndex * 1000 + 1, +2, etc)
-      // Se não encontrou, coloca no final do ano
-      const baseOrder = clubIndex >= 0 
-        ? eventsByYear[year][clubIndex].order 
-        : eventsByYear[year].length * 1000;
-      
-      const achievementOrder = baseOrder + eventsByYear[year].filter(
-        e => e.type === 'achievement' && e.order > baseOrder && e.order < baseOrder + 1000
-      ).length + 1;
-      
-      eventsByYear[year].push({
-        type: 'achievement',
-        year,
-        data: ach,
-        order: achievementOrder
-      });
-    });
-    
-    // Ordenar eventos dentro de cada ano
-    Object.keys(eventsByYear).forEach(year => {
-      eventsByYear[parseInt(year)].sort((a, b) => a.order - b.order);
-    });
-    
-    return eventsByYear;
+    return timeline;
   };
   
-  const timelineEvents = createTimelineEvents();
-  const years = Object.keys(timelineEvents).map(Number).sort((a, b) => a - b);
+  const timeline = createContinuousTimeline();
   
   // Função para renderizar ícone de colocação
   const renderPlacementIcon = (placement?: string) => {
@@ -106,184 +104,168 @@ export default function TimelineHorizontal({ experiences, achievements }: Timeli
   }
   
   return (
-    <div className="space-y-8">
-      <div className="text-center mb-8">
+    <div className="space-y-6">
+      {/* Título */}
+      <div className="text-center">
         <h2 className="text-3xl font-bold text-white mb-2 flex items-center justify-center gap-3">
           <Calendar className="w-8 h-8 text-orange-500" />
           Linha do Tempo da Carreira
         </h2>
-        <p className="text-gray-400">Sua trajetória profissional em ordem cronológica</p>
+        <p className="text-gray-400">Sua trajetória profissional em ordem cronológica (mais recente primeiro)</p>
       </div>
       
-      {years.map((year, yearIndex) => (
-        <div key={year} className="relative">
-          {/* Ano como Divisor */}
-          <div className="flex items-center gap-4 mb-6">
-            <div className="bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 py-3 rounded-xl font-bold text-2xl shadow-lg shadow-orange-500/30">
-              {year}
-            </div>
-            <div className="flex-1 h-px bg-gradient-to-r from-orange-500/50 to-transparent"></div>
-          </div>
+      {/* Timeline Contínua Horizontal */}
+      <div className="bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-sm rounded-2xl p-6 border border-orange-500/20 overflow-hidden">
+        <div className="relative">
+          {/* Linha horizontal contínua */}
+          <div className="absolute top-12 left-0 right-0 h-1 bg-gradient-to-r from-orange-500/50 via-orange-400/50 to-orange-500/50 rounded-full"></div>
           
-          {/* Timeline Horizontal */}
-          <div className="relative">
-            {/* Linha horizontal */}
-            <div className="absolute top-8 left-0 right-0 h-1 bg-gradient-to-r from-orange-500/30 via-orange-400/30 to-orange-500/30 rounded-full hidden md:block"></div>
-            
-            {/* Eventos */}
-            <div className="relative flex flex-col md:flex-row gap-4 md:gap-6 overflow-x-auto pb-4 md:pb-0 scrollbar-thin scrollbar-thumb-orange-500/30 scrollbar-track-transparent">
-              {timelineEvents[year].map((event, index) => (
-                <div
-                  key={`${event.type}-${index}`}
-                  className="relative flex-shrink-0 w-full md:w-64"
-                >
-                  {/* Ponto na linha (apenas desktop) */}
-                  <div className="hidden md:flex absolute top-0 left-1/2 -translate-x-1/2 -translate-y-2 z-10">
-                    <div className={`w-5 h-5 rounded-full border-4 border-gray-900 shadow-lg ${
-                      event.type === 'club' 
-                        ? 'bg-blue-500 shadow-blue-500/50' 
-                        : 'bg-yellow-500 shadow-yellow-500/50'
-                    }`}></div>
-                  </div>
+          {/* Scroll horizontal */}
+          <div className="overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-orange-500/50 scrollbar-track-gray-800/50">
+            <div className="flex items-start gap-3 min-w-max px-2">
+              {timeline.map((item, index) => {
+                if (item.type === 'year') {
+                  // Marcador de Ano
+                  return (
+                    <div key={`year-${item.year}`} className="flex-shrink-0 flex flex-col items-center">
+                      <div className="relative z-20 bg-gradient-to-r from-orange-500 to-red-600 text-white px-4 py-2 rounded-xl font-bold text-lg shadow-lg shadow-orange-500/30 whitespace-nowrap">
+                        {item.year}
+                      </div>
+                      <div className="w-px h-4 bg-orange-500/50 mt-2"></div>
+                    </div>
+                  );
+                } else if (item.type === 'club') {
+                  // Card de Clube (COMPACTO)
+                  const club = item.club!;
+                  const currentYear = item.year;
+                  const endYear = club.current ? new Date().getFullYear() : (club.endYear || club.startYear);
                   
-                  {/* Card do Evento */}
-                  <div className="mt-12 md:mt-8">
-                    {event.type === 'club' ? (
-                      // Card de Clube
-                      <div className="group bg-gradient-to-br from-blue-500/10 to-blue-600/10 backdrop-blur-sm rounded-xl p-4 border border-blue-500/30 hover:border-blue-500/60 transition-all hover:scale-105 shadow-lg hover:shadow-blue-500/20">
-                        <div className="flex items-start gap-3 mb-3">
-                          <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-blue-500/30 transition-colors">
-                            <Building2 className="w-5 h-5 text-blue-400" />
+                  return (
+                    <div key={`club-${club.id}-${currentYear}`} className="flex-shrink-0 flex flex-col items-center" style={{ width: '140px' }}>
+                      {/* Ponto na linha */}
+                      <div className="relative z-10 w-4 h-4 rounded-full bg-blue-500 border-4 border-gray-900 shadow-lg shadow-blue-500/50 mb-2"></div>
+                      
+                      {/* Card compacto */}
+                      <div className="w-full bg-gradient-to-br from-blue-500/10 to-blue-600/10 backdrop-blur-sm rounded-lg p-3 border border-blue-500/30 hover:border-blue-500/60 transition-all hover:scale-105 shadow-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-6 h-6 bg-blue-500/20 rounded flex items-center justify-center flex-shrink-0">
+                            <Building2 className="w-3 h-3 text-blue-400" />
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-bold text-white text-sm line-clamp-2 group-hover:text-blue-300 transition-colors">
-                              {(event.data as CareerExperience).clubName}
-                            </h4>
+                          <h4 className="font-bold text-white text-xs line-clamp-2 leading-tight">
+                            {club.clubName}
+                          </h4>
+                        </div>
+                        
+                        <div className="space-y-1 text-xs text-gray-300">
+                          <div className="truncate">{club.position}</div>
+                          <div className="text-green-400 font-medium">
+                            {club.startYear} - {club.current ? 'Atual' : endYear}
                           </div>
                         </div>
                         
-                        <div className="space-y-2 text-xs">
-                          <div className="flex items-center gap-2 text-gray-300">
-                            <MapPin className="w-3 h-3 text-orange-400 flex-shrink-0" />
-                            <span className="truncate">{(event.data as CareerExperience).position}</span>
-                          </div>
-                          
-                          <div className="flex items-center gap-2 text-gray-300">
-                            <Calendar className="w-3 h-3 text-green-400 flex-shrink-0" />
-                            <span>
-                              {(event.data as CareerExperience).startYear}
-                              {(event.data as CareerExperience).current ? (
-                                <span className="text-green-400 font-semibold"> - Atual</span>
-                              ) : (event.data as CareerExperience).endYear ? (
-                                ` - ${(event.data as CareerExperience).endYear}`
-                              ) : ''}
-                            </span>
-                          </div>
-                        </div>
-                        
-                        {(event.data as CareerExperience).current && (
-                          <div className="mt-3 pt-3 border-t border-blue-500/20">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                              <span className="text-green-400 text-xs font-semibold">Clube Atual</span>
+                        {club.current && currentYear === new Date().getFullYear() && (
+                          <div className="mt-2 pt-2 border-t border-blue-500/20">
+                            <div className="flex items-center gap-1">
+                              <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                              <span className="text-green-400 text-xs font-semibold">Atual</span>
                             </div>
                           </div>
                         )}
                       </div>
-                    ) : (
-                      // Card de Título
-                      <div className="group bg-gradient-to-br from-yellow-500/10 to-orange-600/10 backdrop-blur-sm rounded-xl p-4 border border-yellow-500/30 hover:border-yellow-500/60 transition-all hover:scale-105 shadow-lg hover:shadow-yellow-500/20">
-                        <div className="flex items-start gap-3 mb-3">
-                          <div className="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-yellow-500/30 transition-colors">
-                            <Trophy className="w-5 h-5 text-yellow-400" />
+                    </div>
+                  );
+                } else {
+                  // Card de Título (COMPACTO)
+                  const achievement = item.achievement!;
+                  return (
+                    <div key={`achievement-${achievement.id}`} className="flex-shrink-0 flex flex-col items-center" style={{ width: '140px' }}>
+                      {/* Ponto na linha */}
+                      <div className="relative z-10 w-4 h-4 rounded-full bg-yellow-500 border-4 border-gray-900 shadow-lg shadow-yellow-500/50 mb-2"></div>
+                      
+                      {/* Card compacto */}
+                      <div className="w-full bg-gradient-to-br from-yellow-500/10 to-orange-600/10 backdrop-blur-sm rounded-lg p-3 border border-yellow-500/30 hover:border-yellow-500/60 transition-all hover:scale-105 shadow-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-6 h-6 bg-yellow-500/20 rounded flex items-center justify-center flex-shrink-0">
+                            <Trophy className="w-3 h-3 text-yellow-400" />
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-bold text-white text-sm line-clamp-2 group-hover:text-yellow-300 transition-colors">
-                              {(event.data as Achievement).championship}
-                            </h4>
-                          </div>
+                          <h4 className="font-bold text-white text-xs line-clamp-2 leading-tight">
+                            {achievement.championship}
+                          </h4>
                         </div>
                         
-                        <div className="space-y-2">
-                          {(event.data as Achievement).placement && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-2xl">
-                                {renderPlacementIcon((event.data as Achievement).placement)}
-                              </span>
-                              <span className="text-yellow-300 font-semibold text-sm">
-                                {(event.data as Achievement).placement}
-                              </span>
-                            </div>
-                          )}
-                          
-                          {(event.data as Achievement).award && (
-                            <div className="flex items-center gap-2">
-                              <Star className="w-4 h-4 text-purple-400 flex-shrink-0" />
-                              <span className="text-purple-300 font-semibold text-sm truncate">
-                                {(event.data as Achievement).award}
-                              </span>
-                            </div>
-                          )}
-                          
-                          <div className="flex items-center gap-2 text-gray-400 text-xs mt-2 pt-2 border-t border-yellow-500/20">
-                            <Calendar className="w-3 h-3 flex-shrink-0" />
-                            <span>{(event.data as Achievement).year}</span>
+                        {achievement.placement && (
+                          <div className="flex items-center gap-1 mb-1">
+                            <span className="text-lg">{renderPlacementIcon(achievement.placement)}</span>
+                            <span className="text-yellow-300 font-semibold text-xs truncate">
+                              {achievement.placement}
+                            </span>
                           </div>
-                        </div>
+                        )}
                         
-                        <div className="mt-3 pt-3 border-t border-yellow-500/20">
-                          <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold ${
-                            (event.data as Achievement).type === 'Coletivo'
+                        {achievement.award && (
+                          <div className="text-purple-300 font-semibold text-xs truncate mb-1">
+                            ⭐ {achievement.award}
+                          </div>
+                        )}
+                        
+                        <div className="mt-2 pt-2 border-t border-yellow-500/20">
+                          <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold ${
+                            achievement.type === 'Coletivo'
                               ? 'bg-yellow-500/20 text-yellow-300'
                               : 'bg-purple-500/20 text-purple-300'
                           }`}>
-                            {(event.data as Achievement).type === 'Coletivo' ? '🏆' : '⭐'}
-                            <span>{(event.data as Achievement).type}</span>
+                            {achievement.type === 'Coletivo' ? '🏆' : '⭐'}
+                            <span className="text-xs">{achievement.type}</span>
                           </div>
                         </div>
                       </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                    </div>
+                  );
+                }
+              })}
             </div>
           </div>
-          
-          {/* Separador entre anos (não no último) */}
-          {yearIndex < years.length - 1 && (
-            <div className="mt-8 mb-4 flex items-center gap-4 opacity-30">
-              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-500 to-transparent"></div>
-              <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-500 to-transparent"></div>
-            </div>
-          )}
         </div>
-      ))}
+        
+        {/* Dica de scroll */}
+        <div className="text-center mt-4 text-gray-500 text-xs">
+          ← Arraste para ver toda a linha do tempo (mais recente à esquerda) →
+        </div>
+      </div>
       
-      {/* Estatísticas no final */}
-      <div className="mt-12 pt-8 border-t border-gray-700/50">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 rounded-xl p-4 border border-blue-500/20 text-center">
-            <div className="text-3xl font-bold text-blue-400">{experiences.length}</div>
-            <div className="text-gray-400 text-sm mt-1">Clubes</div>
+      {/* Estatísticas finais */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 rounded-xl p-4 border border-blue-500/20 text-center">
+          <div className="text-3xl font-bold text-blue-400">{experiences.length}</div>
+          <div className="text-gray-400 text-sm mt-1">Clubes</div>
+        </div>
+        
+        <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-600/10 rounded-xl p-4 border border-yellow-500/20 text-center">
+          <div className="text-3xl font-bold text-yellow-400">{achievements.length}</div>
+          <div className="text-gray-400 text-sm mt-1">Conquistas</div>
+        </div>
+        
+        <div className="bg-gradient-to-br from-green-500/10 to-green-600/10 rounded-xl p-4 border border-green-500/20 text-center">
+          <div className="text-3xl font-bold text-green-400">
+            {(() => {
+              const yearsSet = new Set<number>();
+              experiences.forEach(exp => {
+                const endYear = exp.current ? new Date().getFullYear() : (exp.endYear || exp.startYear);
+                for (let year = exp.startYear; year <= endYear; year++) {
+                  yearsSet.add(year);
+                }
+              });
+              return yearsSet.size;
+            })()}
           </div>
-          
-          <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-600/10 rounded-xl p-4 border border-yellow-500/20 text-center">
-            <div className="text-3xl font-bold text-yellow-400">{achievements.length}</div>
-            <div className="text-gray-400 text-sm mt-1">Conquistas</div>
+          <div className="text-gray-400 text-sm mt-1">Anos de Carreira</div>
+        </div>
+        
+        <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/10 rounded-xl p-4 border border-purple-500/20 text-center">
+          <div className="text-3xl font-bold text-purple-400">
+            {achievements.filter(a => a.placement === '1º Lugar' || a.award).length}
           </div>
-          
-          <div className="bg-gradient-to-br from-green-500/10 to-green-600/10 rounded-xl p-4 border border-green-500/20 text-center">
-            <div className="text-3xl font-bold text-green-400">{years.length}</div>
-            <div className="text-gray-400 text-sm mt-1">Anos de Carreira</div>
-          </div>
-          
-          <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/10 rounded-xl p-4 border border-purple-500/20 text-center">
-            <div className="text-3xl font-bold text-purple-400">
-              {achievements.filter(a => a.placement === '1º Lugar' || a.award).length}
-            </div>
-            <div className="text-gray-400 text-sm mt-1">Títulos/Prêmios</div>
-          </div>
+          <div className="text-gray-400 text-sm mt-1">Títulos/Prêmios</div>
         </div>
       </div>
     </div>
