@@ -264,7 +264,7 @@ export default function TimelineHorizontal({
                           <div className="w-6 h-6 bg-yellow-500/20 rounded flex items-center justify-center flex-shrink-0">
                             <Trophy className="w-3 h-3 text-yellow-400" />
                           </div>
-                          <h4 className="font-bold text-white text-xs line-clamp-2 leading-tight">
+                          <h4 className="font-bold text-white text-xs leading-tight">
                             {achievement.championship}
                           </h4>
                         </div>
@@ -272,14 +272,14 @@ export default function TimelineHorizontal({
                         {achievement.placement && (
                           <div className="flex items-center gap-1 mb-1">
                             <span className="text-lg">{renderPlacementIcon(achievement.placement)}</span>
-                            <span className="text-yellow-300 font-semibold text-xs truncate">
+                            <span className="text-yellow-300 font-semibold text-xs">
                               {achievement.placement}
                             </span>
                           </div>
                         )}
                         
                         {achievement.award && (
-                          <div className="text-purple-300 font-semibold text-xs truncate mb-1">
+                          <div className="text-purple-300 font-semibold text-xs mb-1">
                             ⭐ {achievement.award}
                           </div>
                         )}
@@ -347,4 +347,3 @@ export default function TimelineHorizontal({
     </div>
   );
 }
-  

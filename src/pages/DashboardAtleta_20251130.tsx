@@ -182,21 +182,12 @@ export default function DashboardAtleta() {
   };
 
   const totalClubes = atletaProfile?.experiences?.length || 0;
-  const totalCompeticoes = atletaProfile?.achievements?.length || 0;
-  const totalTitulos = atletaProfile?.achievements?.filter(
-    (ach) => ach.placement === '1º Lugar'
-  ).length || 0;
+  const totalTitulos = atletaProfile?.achievements?.length || 0;
   const anosCarreira = calcularAnosCarreira();
   const idade = calcularIdade();
   const clubeAtual = getCurrentClub();
-  const isProfileEmpty = totalClubes === 0 && totalCompeticoes === 0;
+  const isProfileEmpty = totalClubes === 0 && totalTitulos === 0;
   const registeredClubs = atletaProfile?.experiences?.map(exp => exp.clubName) || [];
-  const principaisConquistas = (atletaProfile?.achievements || [])
-    .filter((ach) => 
-      (ach.placement && ach.placement !== 'Participante') ||
-      (ach.award && ach.award.trim() !== '')
-    )
-    .sort((a, b) => b.year - a.year);
 
   // Ordenar experiências por ano
   const sortedExperiences = [...(atletaProfile?.experiences || [])].sort((a, b) => a.startYear - b.startYear);
@@ -455,9 +446,7 @@ export default function DashboardAtleta() {
                                       {achievements.length > 0 && (
                                         <div className="flex items-center gap-2 text-yellow-400 text-sm">
                                           <Trophy size={16} />
-                                          <span className="font-medium">
-                                            {achievements.length} {achievements.length === 1 ? 'competição' : 'competições'}
-                                          </span>
+                                          <span className="font-medium">{achievements.length} {achievements.length === 1 ? 'título' : 'títulos'}</span>
                                         </div>
                                       )}
 
@@ -476,9 +465,7 @@ export default function DashboardAtleta() {
                                             <Trophy size={16} className="text-yellow-400 flex-shrink-0 mt-0.5" />
                                             <div className="flex-1 min-w-0">
                                               <div className="text-white font-medium text-sm">{ach.championship}</div>
-                                              <div className="text-yellow-400 text-xs">
-                                                {ach.year} • {ach.placement || ach.award}
-                                              </div>
+                                              <div className="text-yellow-400 text-xs">{ach.year} • {ach.placement || ach.award}</div>
                                             </div>
                                           </div>
                                         </div>
@@ -498,14 +485,14 @@ export default function DashboardAtleta() {
                     </div>
 
                     {/* DESTAQUES E CONQUISTAS */}
-                    {principaisConquistas.length > 0 && (
+                    {totalTitulos > 0 && (
                       <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-600/10 backdrop-blur-sm rounded-2xl p-6 border border-yellow-500/20">
                         <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
                           <Star className="text-yellow-400" />
                           Principais Conquistas
                         </h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {principaisConquistas.slice(0, 4).map((ach) => (
+                          {atletaProfile?.achievements?.slice(0, 4).map((ach) => (
                             <div key={ach.id} className="bg-gray-800/50 rounded-lg p-4 border border-yellow-500/20">
                               <div className="flex items-start gap-3">
                                 <div className="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -514,14 +501,9 @@ export default function DashboardAtleta() {
                                 <div className="flex-1 min-w-0">
                                   <h3 className="text-white font-semibold mb-1">{ach.championship}</h3>
                                   <p className="text-gray-400 text-sm">{ach.club} • {ach.year}</p>
-                                  {(ach.placement && ach.placement !== 'Participante') && (
+                                  {ach.placement && (
                                     <span className="inline-block mt-2 bg-yellow-500/20 text-yellow-400 text-xs font-medium px-2 py-1 rounded">
                                       {ach.placement}
-                                    </span>
-                                  )}
-                                  {ach.award && ach.award.trim() !== '' && (
-                                    <span className="inline-block mt-2 ml-2 bg-purple-500/20 text-purple-300 text-xs font-medium px-2 py-1 rounded">
-                                      {ach.award}
                                     </span>
                                   )}
                                 </div>
@@ -529,12 +511,12 @@ export default function DashboardAtleta() {
                             </div>
                           ))}
                         </div>
-                        {principaisConquistas.length > 4 && (
+                        {totalTitulos > 4 && (
                           <button 
                             onClick={() => setActiveSection('trajetoria')}
                             className="w-full mt-4 text-yellow-400 hover:text-yellow-300 text-sm font-medium transition-colors"
                           >
-                            Ver todas as {principaisConquistas.length} conquistas →
+                            Ver todos os {totalTitulos} títulos →
                           </button>
                         )}
                       </div>
