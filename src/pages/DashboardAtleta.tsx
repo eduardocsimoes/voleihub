@@ -36,6 +36,7 @@ import EmptyState from '../components/EmptyState';
 import CarreiraTimeline from '../components/CarreiraTimeline';
 import TimelineHorizontal from '../components/TimelineHorizontal';
 import RankingAtletas from "./RankingAtletas";
+import XPHistory from "../components/XPHistory";
 
 
 // 🔥 Gamificação
@@ -730,6 +731,9 @@ export default function DashboardAtleta() {
             )}
 
             {activeSection === 'statistics' && <StatisticsSection />}
+            {activeSection === 'xp-history' && (
+              <XPHistory history={atletaProfile?.xpHistory || []} />
+            )}
             {activeSection === 'trajetoria' && (
               <div className="space-y-6">
                 {/* Botões de Ação */}

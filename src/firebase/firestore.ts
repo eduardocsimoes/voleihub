@@ -53,8 +53,7 @@ export interface Achievement {
   award?: string;
 }
 
-// ⭐⭐⭐ ADICIONADO – sem quebrar nada ⭐⭐⭐
-// Pontuação dinâmica do atleta
+// ⭐⭐⭐ Gamificação – estatísticas calculadas dinamicamente ⭐⭐⭐
 export interface GamificationStats {
   careerScore: number;
   level: number;
@@ -70,11 +69,19 @@ export interface AtletaProfile extends UserProfile {
   state?: string;
   phone?: string;
   bio?: string;
+
+  // Histórico futuro de XP (se quiser log de evoluções)
+  xpHistory?: {
+    date: string;
+    xp: number;
+    reason: string;
+  }[];
+
   experiences?: CareerExperience[];
   achievements?: Achievement[];
   seeking?: ('clube' | 'patrocinio' | 'treinador')[];
 
-  // ⭐⭐⭐ ADICIONADO – opcional, não quebra o Firestore ⭐⭐⭐
+  // Campos de gamificação (opcionais, não quebram dados antigos)
   careerScore?: number;
   level?: number;
 }
@@ -178,19 +185,18 @@ export async function completeOnboarding(uid: string) {
 // ==================== FUNÇÕES DE ATLETA =====================
 // ============================================================
 
-// ⭐⭐⭐ NOVO – Função de cálculo da pontuação ⭐⭐⭐
-// Regras simples (versão 1.0):
+// ⭐⭐⭐ Função de cálculo da pontuação (versão 1.0) ⭐⭐⭐
 // Participar campeonato: 10 pts
 // Medalhas: 1º=60, 2º=40, 3º=30
 // Premiação individual: 50 pts
-// Convocação (award === 'Seleção Estadual'): +80
-// Convocação (award === 'Seleção Brasileira'): +200
+// Convocação (award === 'Convocação Seleção Estadual'): +80
+// Convocação (award === 'Convocação Seleção Brasileira'): +200
 
 export function calculateCareerScore(profile: AtletaProfile): GamificationStats {
   let score = 0;
 
-  (profile.achievements || []).forEach(a => {
-    // Participação simples
+  (profile.achievements || []).forEach((a) => {
+    // Participação simples (qualquer competição cadastrada conta)
     score += 10;
 
     if (a.placement === '1º Lugar') score += 60;
@@ -203,7 +209,7 @@ export function calculateCareerScore(profile: AtletaProfile): GamificationStats 
     if (a.award === 'Convocação Seleção Brasileira') score += 200;
   });
 
-  // Converter score → level
+  // Converter score → level (escala simples)
   const level = Math.floor(score / 150) + 1;
 
   return { careerScore: score, level };
@@ -231,8 +237,8 @@ export async function createAtletaProfile(
     onboardingCompleted: false,
     experiences: [],
     achievements: [],
-    careerScore: 0,     // ⭐ adicionado
-    level: 1,           // ⭐ adicionado
+    careerScore: 0, // inicial
+    level: 1,       // inicial
     ...additionalData,
   };
 
@@ -273,10 +279,11 @@ export async function getUserProfile(uid: string): Promise<AtletaProfile | null>
         updatedAt: data.updatedAt,
         onboardingCompleted: data.onboardingCompleted,
         careerScore: data.careerScore || 0,
-        level: data.level || 1
+        level: data.level || 1,
+        xpHistory: data.xpHistory || [],
       };
 
-      // ⭐ Atualiza score dinamicamente (opcional)
+      // ⭐ Atualiza score dinamicamente com base nas conquistas atuais
       const stats = calculateCareerScore(profile);
       profile.careerScore = stats.careerScore;
       profile.level = stats.level;

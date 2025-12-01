@@ -4,6 +4,7 @@ import {
   User, 
   Crown,
   Award,
+  TrendingUp,
   BarChart3, 
   Trophy, 
   Image, 
@@ -30,6 +31,7 @@ const menuItems = [
   { id: 'achievements', label: 'Conquistas', icon: Trophy },
   { id: 'ranking-atletas', label: 'Ranking de Atletas', icon: Crown },
   { id: 'ranking', label: 'Ranking Global', icon: Award },
+  { id: 'xp-history', label: 'Histórico de XP', icon: TrendingUp },
 
   { id: 'gallery', label: 'Galeria', icon: Image },
   { id: 'documents', label: 'Documentos', icon: FileText },
