@@ -35,6 +35,8 @@ import StatisticsSection from '../components/StatisticsSection';
 import EmptyState from '../components/EmptyState';
 import CarreiraTimeline from '../components/CarreiraTimeline';
 import TimelineHorizontal from '../components/TimelineHorizontal';
+import RankingAtletas from "./RankingAtletas";
+
 
 // 🔥 Gamificação
 import { calculateAthleteGamification } from '../gamification/gamification';
@@ -760,6 +762,7 @@ export default function DashboardAtleta() {
               </div>
             )}
             {activeSection === 'achievements' && (<BadgesSection atletaProfile={atletaProfile ?? null} />)}
+            {activeSection === 'ranking-atletas' && <RankingAtletas />}
             {activeSection === 'profile' && (
               <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 border border-orange-500/20">
                 <h2 className="text-2xl font-bold text-white mb-6">Perfil Completo</h2>

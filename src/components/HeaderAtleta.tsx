@@ -8,9 +8,11 @@ interface HeaderAtletaProps {
   atletaProfile: AtletaProfile;
   onMenuClick: () => void;
   onEditProfile: () => void;
+  /** Quando true, esconde o bloco grande de perfil (usado em Ranking, Badges etc.) */
+  hideProfile?: boolean;
 }
 
-export default function HeaderAtleta({ atletaProfile, onMenuClick, onEditProfile }: HeaderAtletaProps) {
+export default function HeaderAtleta({ atletaProfile, onMenuClick, onEditProfile, hideProfile, }: HeaderAtletaProps) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 

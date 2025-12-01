@@ -2,6 +2,8 @@ import React from 'react';
 import { 
   Home, 
   User, 
+  Crown,
+  Award,
   BarChart3, 
   Trophy, 
   Image, 
@@ -26,6 +28,9 @@ const menuItems = [
   { id: 'profile', label: 'Perfil Completo', icon: User },
   { id: 'statistics', label: 'Estatísticas', icon: BarChart3 },
   { id: 'achievements', label: 'Conquistas', icon: Trophy },
+  { id: 'ranking-atletas', label: 'Ranking de Atletas', icon: Crown },
+  { id: 'ranking', label: 'Ranking Global', icon: Award },
+
   { id: 'gallery', label: 'Galeria', icon: Image },
   { id: 'documents', label: 'Documentos', icon: FileText },
   { id: 'messages', label: 'Mensagens', icon: MessageSquare, badge: 3 },
@@ -109,7 +114,7 @@ export default function Sidebar({ isOpen, setIsOpen, activeSection, setActiveSec
                   </>
                 )}
 
-                {/* Tooltip para sidebar fechada */}
+                {/* Tooltip */}
                 {!isOpen && (
                   <div className="absolute left-full ml-2 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
                     {item.label}
