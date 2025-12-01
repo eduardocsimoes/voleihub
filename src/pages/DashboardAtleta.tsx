@@ -759,7 +759,7 @@ export default function DashboardAtleta() {
                 />
               </div>
             )}
-            {activeSection === 'achievements' && <BadgesSection />}
+            {activeSection === 'achievements' && (<BadgesSection atletaProfile={atletaProfile ?? null} />)}
             {activeSection === 'profile' && (
               <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-8 border border-orange-500/20">
                 <h2 className="text-2xl font-bold text-white mb-6">Perfil Completo</h2>
