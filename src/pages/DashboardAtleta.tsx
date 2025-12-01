@@ -10,7 +10,21 @@ import {
   updateAchievement,
   deleteAchievement
 } from '../firebase/firestore';
-import { Calendar, Ruler, Weight, Edit, MapPin, Trophy, TrendingUp, Eye, Users, Award, Clock, Star } from 'lucide-react';
+import { 
+  Calendar, 
+  Ruler, 
+  Weight, 
+  Edit, 
+  MapPin, 
+  Trophy, 
+  TrendingUp, 
+  Eye, 
+  Users, 
+  Award, 
+  Clock, 
+  Star 
+} from 'lucide-react';
+
 import AdicionarCarreira from '../components/AdicionarCarreira';
 import EditarPerfilModal from '../components/EditarPerfilModal';
 import Sidebar from '../components/Sidebar';
@@ -21,6 +35,9 @@ import StatisticsSection from '../components/StatisticsSection';
 import EmptyState from '../components/EmptyState';
 import CarreiraTimeline from '../components/CarreiraTimeline';
 import TimelineHorizontal from '../components/TimelineHorizontal';
+
+// 🔥 Gamificação
+import { calculateAthleteGamification } from '../gamification/gamification';
 
 type ModalType = 'experience' | 'achievement' | 'editProfile' | null;
 
@@ -191,12 +208,24 @@ export default function DashboardAtleta() {
   const clubeAtual = getCurrentClub();
   const isProfileEmpty = totalClubes === 0 && totalCompeticoes === 0;
   const registeredClubs = atletaProfile?.experiences?.map(exp => exp.clubName) || [];
+
+
   const principaisConquistas = (atletaProfile?.achievements || [])
     .filter((ach) => 
       (ach.placement && ach.placement !== 'Participante') ||
       (ach.award && ach.award.trim() !== '')
     )
     .sort((a, b) => b.year - a.year);
+
+  // 🔢 Gamificação (XP, nível, título, progresso)
+  const gamification = calculateAthleteGamification(atletaProfile);
+  const {
+    xp,
+    level,
+    title: levelTitle,
+    nextLevelXP,
+    progress
+  } = gamification;
 
   // Ordenar experiências por ano
   const sortedExperiences = [...(atletaProfile?.experiences || [])].sort((a, b) => a.startYear - b.startYear);
@@ -284,15 +313,33 @@ export default function DashboardAtleta() {
                             <div className="flex items-start justify-between gap-4 mb-3">
                               <div>
                                 <h1 className="text-3xl sm:text-4xl font-bold text-white mb-1">{atletaProfile?.name}</h1>
-                                <div className="flex flex-wrap items-center gap-3 mb-2">
-                                  <span className="text-orange-400 text-lg font-semibold">{atletaProfile?.position || 'Posição não definida'}</span>
-                                  {idade && <span className="text-gray-400">• {idade} anos</span>}
-                                  {clubeAtual && (
-                                    <span className="bg-orange-500/20 text-orange-400 px-3 py-1 rounded-full text-sm font-medium border border-orange-500/30">
-                                      {clubeAtual.clubName}
-                                    </span>
-                                  )}
+
+                                {/* ===================== GAMIFICAÇÃO ===================== */}
+                                <div className="mt-4 bg-gray-800/40 border border-purple-500/40 p-4 rounded-xl">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div>
+                                      <div className="text-purple-400 font-semibold">
+                                        Nível {gamification.level} • {gamification.title}
+                                      </div>
+                                      <div className="text-gray-400 text-sm">
+                                        {gamification.xp} XP • Próximo nível com {gamification.nextLevelXP} XP
+                                      </div>
+                                    </div>
+
+                                    <div className="text-purple-300 font-bold text-lg">
+                                      {gamification.progress}%
+                                    </div>
+                                  </div>
+
+                                  {/* Barra de progresso */}
+                                  <div className="w-full h-3 bg-gray-700/50 rounded-full overflow-hidden border border-gray-600">
+                                    <div
+                                      className="h-full bg-gradient-to-r from-purple-500 to-purple-400 transition-all duration-500"
+                                      style={{ width: `${gamification.progress}%` }}
+                                    />
+                                  </div>
                                 </div>
+
                               </div>
                               <button 
                                 onClick={() => setModalAberto('editProfile')} 
@@ -381,13 +428,34 @@ export default function DashboardAtleta() {
                         <div className="text-green-200 text-sm">Visualizações do Perfil</div>
                       </div>
 
+                      {/* CARD DE GAMIFICAÇÃO */}
                       <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/20 backdrop-blur-sm rounded-xl p-6 border border-purple-500/30">
                         <div className="flex items-center justify-between mb-2">
                           <Award className="w-8 h-8 text-purple-400" />
                           <Star className="w-5 h-5 text-purple-400" />
                         </div>
-                        <div className="text-3xl font-bold text-white mb-1">12</div>
-                        <div className="text-purple-200 text-sm">Clubes Interessados</div>
+                        <div className="text-2xl font-bold text-white mb-1">
+                          Nível {level}
+                        </div>
+                        <div className="text-purple-100 text-sm mb-3">
+                          {levelTitle}
+                        </div>
+                        <div className="mt-1">
+                          <div className="flex items-center justify-between text-[11px] text-purple-100 mb-1">
+                            <span>{xp} XP</span>
+                            <span>
+                              {nextLevelXP <= xp
+                                ? 'Nível máximo'
+                                : `Próx. nível: ${nextLevelXP} XP`}
+                            </span>
+                          </div>
+                          <div className="w-full h-2 bg-purple-900/40 rounded-full overflow-hidden">
+                            <div
+                              className="h-2 bg-purple-400 rounded-full transition-all"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -413,7 +481,7 @@ export default function DashboardAtleta() {
 
                           {/* Cards dos clubes */}
                           <div className="flex overflow-x-auto pb-4 gap-4 scrollbar-thin scrollbar-thumb-orange-500/50 scrollbar-track-gray-800">
-                            {sortedExperiences.map((exp, index) => {
+                            {sortedExperiences.map((exp) => {
                               const achievements = getClubAchievements(exp.clubName);
                               const isSelected = selectedClub?.id === exp.id;
                               const isCurrent = exp.current;
@@ -475,7 +543,9 @@ export default function DashboardAtleta() {
                                           <div className="flex items-start gap-2">
                                             <Trophy size={16} className="text-yellow-400 flex-shrink-0 mt-0.5" />
                                             <div className="flex-1 min-w-0">
-                                              <div className="text-white font-medium text-sm">{ach.championship}</div>
+                                              <div className="text-white font-medium text-sm break-words">
+                                                {ach.championship}
+                                              </div>
                                               <div className="text-yellow-400 text-xs">
                                                 {ach.year} • {ach.placement || ach.award}
                                               </div>
@@ -555,7 +625,6 @@ export default function DashboardAtleta() {
                                   </div>
                                 </div>
 
-                                {/* Faixa de Colocação OU Prêmio */}
                                 {(ach.placement || ach.award) && (
                                   <span className="inline-block bg-yellow-500/20 text-yellow-400 text-xs 
                                                   font-semibold px-2 py-0.5 rounded text-center">
@@ -566,7 +635,6 @@ export default function DashboardAtleta() {
                             ))}
                           </div>
 
-                          {/* BOTÃO DE VER TODAS */}
                           <button 
                             onClick={() => setActiveSection('trajetoria')}
                             className="w-full mt-4 text-yellow-400 hover:text-yellow-300 

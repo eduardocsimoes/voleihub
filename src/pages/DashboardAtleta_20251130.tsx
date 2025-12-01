@@ -182,12 +182,21 @@ export default function DashboardAtleta() {
   };
 
   const totalClubes = atletaProfile?.experiences?.length || 0;
-  const totalTitulos = atletaProfile?.achievements?.length || 0;
+  const totalCompeticoes = atletaProfile?.achievements?.length || 0;
+  const totalTitulos = atletaProfile?.achievements?.filter(
+    (ach) => ach.placement === '1º Lugar'
+  ).length || 0;
   const anosCarreira = calcularAnosCarreira();
   const idade = calcularIdade();
   const clubeAtual = getCurrentClub();
-  const isProfileEmpty = totalClubes === 0 && totalTitulos === 0;
+  const isProfileEmpty = totalClubes === 0 && totalCompeticoes === 0;
   const registeredClubs = atletaProfile?.experiences?.map(exp => exp.clubName) || [];
+  const principaisConquistas = (atletaProfile?.achievements || [])
+    .filter((ach) => 
+      (ach.placement && ach.placement !== 'Participante') ||
+      (ach.award && ach.award.trim() !== '')
+    )
+    .sort((a, b) => b.year - a.year);
 
   // Ordenar experiências por ano
   const sortedExperiences = [...(atletaProfile?.experiences || [])].sort((a, b) => a.startYear - b.startYear);
@@ -446,7 +455,9 @@ export default function DashboardAtleta() {
                                       {achievements.length > 0 && (
                                         <div className="flex items-center gap-2 text-yellow-400 text-sm">
                                           <Trophy size={16} />
-                                          <span className="font-medium">{achievements.length} {achievements.length === 1 ? 'título' : 'títulos'}</span>
+                                          <span className="font-medium">
+                                            {achievements.length} {achievements.length === 1 ? 'competição' : 'competições'}
+                                          </span>
                                         </div>
                                       )}
 
@@ -465,7 +476,9 @@ export default function DashboardAtleta() {
                                             <Trophy size={16} className="text-yellow-400 flex-shrink-0 mt-0.5" />
                                             <div className="flex-1 min-w-0">
                                               <div className="text-white font-medium text-sm">{ach.championship}</div>
-                                              <div className="text-yellow-400 text-xs">{ach.year} • {ach.placement || ach.award}</div>
+                                              <div className="text-yellow-400 text-xs">
+                                                {ach.year} • {ach.placement || ach.award}
+                                              </div>
                                             </div>
                                           </div>
                                         </div>
@@ -484,43 +497,86 @@ export default function DashboardAtleta() {
                       )}
                     </div>
 
-                    {/* DESTAQUES E CONQUISTAS */}
-                    {totalTitulos > 0 && (
-                      <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-600/10 backdrop-blur-sm rounded-2xl p-6 border border-yellow-500/20">
-                        <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
-                          <Star className="text-yellow-400" />
-                          Principais Conquistas
-                        </h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {atletaProfile?.achievements?.slice(0, 4).map((ach) => (
-                            <div key={ach.id} className="bg-gray-800/50 rounded-lg p-4 border border-yellow-500/20">
-                              <div className="flex items-start gap-3">
-                                <div className="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                                  <Trophy className="text-yellow-400" size={20} />
+                    {/* PRINCIPAIS CONQUISTAS */}
+                    {atletaProfile?.achievements && atletaProfile.achievements.length > 0 && (() => {
+                      
+                      const filtered = atletaProfile.achievements
+                        .filter(ach =>
+                          ach.type === 'Individual' ||
+                          ach.placement === '1º Lugar' ||
+                          ach.placement === '2º Lugar' ||
+                          ach.placement === '3º Lugar'
+                        )
+                        .sort((a, b) => b.year - a.year);
+
+                      if (filtered.length === 0) return null;
+
+                      // Máximo de 10 cards (até 5 por linha × 2 linhas)
+                      const visible = filtered.slice(0, 10);
+
+                      return (
+                        <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-600/10 
+                                        backdrop-blur-sm rounded-2xl p-5 border border-yellow-500/20">
+
+                          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                            <Star className="text-yellow-400" />
+                            Principais Conquistas
+                          </h2>
+
+                          {/* GRID OTIMIZADO: 1 → 2 → 4 → 5 COLUNAS */}
+                          <div className="
+                            grid
+                            grid-cols-1
+                            sm:grid-cols-2
+                            md:grid-cols-3
+                            lg:grid-cols-4
+                            xl:grid-cols-5
+                            gap-4
+                          ">
+                            {visible.map((ach) => (
+                              <div 
+                                key={ach.id}
+                                className="bg-gray-800/40 rounded-lg p-3 border border-yellow-500/20 
+                                          hover:bg-gray-800/60 transition-all shadow-sm flex flex-col justify-between"
+                              >
+                                <div className="flex items-start gap-2 mb-2">
+                                  <div className="w-7 h-7 bg-yellow-500/20 rounded flex items-center justify-center">
+                                    <Trophy className="text-yellow-400" size={15} />
+                                  </div>
+
+                                  <div className="flex-1 min-w-0">
+                                    <h3 className="text-white font-semibold text-sm leading-tight mb-1 line-clamp-2">
+                                      {ach.championship}
+                                    </h3>
+
+                                    <p className="text-gray-400 text-xs mb-1 truncate">
+                                      {ach.club} • {ach.year}
+                                    </p>
+                                  </div>
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <h3 className="text-white font-semibold mb-1">{ach.championship}</h3>
-                                  <p className="text-gray-400 text-sm">{ach.club} • {ach.year}</p>
-                                  {ach.placement && (
-                                    <span className="inline-block mt-2 bg-yellow-500/20 text-yellow-400 text-xs font-medium px-2 py-1 rounded">
-                                      {ach.placement}
-                                    </span>
-                                  )}
-                                </div>
+
+                                {/* Faixa de Colocação OU Prêmio */}
+                                {(ach.placement || ach.award) && (
+                                  <span className="inline-block bg-yellow-500/20 text-yellow-400 text-xs 
+                                                  font-semibold px-2 py-0.5 rounded text-center">
+                                    {ach.placement || ach.award}
+                                  </span>
+                                )}
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                        {totalTitulos > 4 && (
+                            ))}
+                          </div>
+
+                          {/* BOTÃO DE VER TODAS */}
                           <button 
                             onClick={() => setActiveSection('trajetoria')}
-                            className="w-full mt-4 text-yellow-400 hover:text-yellow-300 text-sm font-medium transition-colors"
+                            className="w-full mt-4 text-yellow-400 hover:text-yellow-300 
+                                      text-sm font-medium text-center transition-colors"
                           >
-                            Ver todos os {totalTitulos} títulos →
+                            Ver todas as {filtered.length} conquistas →
                           </button>
-                        )}
-                      </div>
-                    )}
+                        </div>
+                      );
+                    })()}
 
                     {/* ÚLTIMAS ATIVIDADES */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

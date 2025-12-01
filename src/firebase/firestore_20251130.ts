@@ -9,15 +9,11 @@ import {
 } from 'firebase/firestore';
 import { db } from './config';
 
-// ============================================================
-// ==================== TIPOS EXPORTADOS ======================
-// ============================================================
+// ==================== TIPOS EXPORTADOS ====================
 
 export type ProfileType = 'atleta' | 'clube' | 'treinador' | 'agente' | 'patrocinador';
 
-// ============================================================
-// ==================== TIPOS BASE ============================
-// ============================================================
+// ==================== TIPOS BASE ====================
 
 export interface UserProfile {
   uid: string;
@@ -29,9 +25,7 @@ export interface UserProfile {
   onboardingCompleted?: boolean;
 }
 
-// ============================================================
-// ==================== TIPOS PARA ATLETA =====================
-// ============================================================
+// ==================== TIPOS PARA ATLETA ====================
 
 export interface CareerExperience {
   id: string;
@@ -53,13 +47,6 @@ export interface Achievement {
   award?: string;
 }
 
-// ⭐⭐⭐ ADICIONADO – sem quebrar nada ⭐⭐⭐
-// Pontuação dinâmica do atleta
-export interface GamificationStats {
-  careerScore: number;
-  level: number;
-}
-
 export interface AtletaProfile extends UserProfile {
   photoURL?: string;
   position?: string;
@@ -73,15 +60,9 @@ export interface AtletaProfile extends UserProfile {
   experiences?: CareerExperience[];
   achievements?: Achievement[];
   seeking?: ('clube' | 'patrocinio' | 'treinador')[];
-
-  // ⭐⭐⭐ ADICIONADO – opcional, não quebra o Firestore ⭐⭐⭐
-  careerScore?: number;
-  level?: number;
 }
 
-// ============================================================
-// ==================== TIPOS PARA CLUBE ======================
-// ============================================================
+// ==================== TIPOS PARA CLUBE ====================
 
 export interface ClubeProfile extends UserProfile {
   clubName: string;
@@ -106,9 +87,7 @@ export interface ClubeProfile extends UserProfile {
   seeking?: ('atletas' | 'treinadores' | 'patrocinadores')[];
 }
 
-// ============================================================
-// ==================== TIPOS PARA TREINADOR ==================
-// ============================================================
+// ==================== TIPOS PARA TREINADOR ====================
 
 export interface TreinadorProfile extends UserProfile {
   specialty?: string;
@@ -125,9 +104,7 @@ export interface TreinadorProfile extends UserProfile {
   availability?: string;
 }
 
-// ============================================================
-// ==================== TIPOS PARA AGENTE =====================
-// ============================================================
+// ==================== TIPOS PARA AGENTE ====================
 
 export interface AgenteProfile extends UserProfile {
   company?: string;
@@ -142,9 +119,7 @@ export interface AgenteProfile extends UserProfile {
   website?: string;
 }
 
-// ============================================================
-// ==================== TIPOS PARA PATROCINADOR ===============
-// ============================================================
+// ==================== TIPOS PARA PATROCINADOR ====================
 
 export interface PatrocinadorProfile extends UserProfile {
   companyName: string;
@@ -162,9 +137,7 @@ export interface PatrocinadorProfile extends UserProfile {
   seeking?: ('atletas' | 'clubes' | 'eventos')[];
 }
 
-// ============================================================
-// ==================== FUNÇÕES GERAIS ========================
-// ============================================================
+// ==================== FUNÇÕES GERAIS ====================
 
 export async function completeOnboarding(uid: string) {
   const userRef = doc(db, 'users', uid);
@@ -174,44 +147,7 @@ export async function completeOnboarding(uid: string) {
   });
 }
 
-// ============================================================
-// ==================== FUNÇÕES DE ATLETA =====================
-// ============================================================
-
-// ⭐⭐⭐ NOVO – Função de cálculo da pontuação ⭐⭐⭐
-// Regras simples (versão 1.0):
-// Participar campeonato: 10 pts
-// Medalhas: 1º=60, 2º=40, 3º=30
-// Premiação individual: 50 pts
-// Convocação (award === 'Seleção Estadual'): +80
-// Convocação (award === 'Seleção Brasileira'): +200
-
-export function calculateCareerScore(profile: AtletaProfile): GamificationStats {
-  let score = 0;
-
-  (profile.achievements || []).forEach(a => {
-    // Participação simples
-    score += 10;
-
-    if (a.placement === '1º Lugar') score += 60;
-    if (a.placement === '2º Lugar') score += 40;
-    if (a.placement === '3º Lugar') score += 30;
-
-    if (a.type === 'Individual') score += 50;
-
-    if (a.award === 'Convocação Seleção Estadual') score += 80;
-    if (a.award === 'Convocação Seleção Brasileira') score += 200;
-  });
-
-  // Converter score → level
-  const level = Math.floor(score / 150) + 1;
-
-  return { careerScore: score, level };
-}
-
-// ============================================================
-// ============ CREATE ATLETA COM SCORE INICIAL ===============
-// ============================================================
+// ==================== FUNÇÕES DE ATLETA ====================
 
 export async function createAtletaProfile(
   uid: string,
@@ -220,7 +156,6 @@ export async function createAtletaProfile(
   additionalData: Partial<AtletaProfile> = {}
 ) {
   const atletaRef = doc(db, 'users', uid);
-
   const atletaData: AtletaProfile = {
     uid,
     email,
@@ -231,18 +166,12 @@ export async function createAtletaProfile(
     onboardingCompleted: false,
     experiences: [],
     achievements: [],
-    careerScore: 0,     // ⭐ adicionado
-    level: 1,           // ⭐ adicionado
     ...additionalData,
   };
 
   await setDoc(atletaRef, atletaData);
   return atletaData;
 }
-
-// ============================================================
-// =================== GET USER PROFILE ========================
-// ============================================================
 
 export async function getUserProfile(uid: string): Promise<AtletaProfile | null> {
   try {
@@ -251,8 +180,7 @@ export async function getUserProfile(uid: string): Promise<AtletaProfile | null>
 
     if (userSnap.exists()) {
       const data = userSnap.data();
-
-      const profile: AtletaProfile = {
+      return {
         uid: data.uid,
         email: data.email,
         name: data.name,
@@ -272,16 +200,7 @@ export async function getUserProfile(uid: string): Promise<AtletaProfile | null>
         createdAt: data.createdAt,
         updatedAt: data.updatedAt,
         onboardingCompleted: data.onboardingCompleted,
-        careerScore: data.careerScore || 0,
-        level: data.level || 1
-      };
-
-      // ⭐ Atualiza score dinamicamente (opcional)
-      const stats = calculateCareerScore(profile);
-      profile.careerScore = stats.careerScore;
-      profile.level = stats.level;
-
-      return profile;
+      } as AtletaProfile;
     }
 
     return null;
@@ -290,10 +209,6 @@ export async function getUserProfile(uid: string): Promise<AtletaProfile | null>
     return null;
   }
 }
-
-// ============================================================
-// ==================== UPDATE ATLETA ==========================
-// ============================================================
 
 export async function updateAtletaProfile(
   uid: string,
@@ -306,32 +221,38 @@ export async function updateAtletaProfile(
   });
 }
 
-// ============================================================
-// ================ EXPERIENCES (CRUD) =========================
-// ============================================================
-
 export async function addExperience(uid: string, experience: CareerExperience) {
   const userRef = doc(db, 'users', uid);
   
-  const userSnap = await getDoc(userRef);
-  if (!userSnap.exists()) throw new Error('Usuário não encontrado');
-
-  const data = userSnap.data();
-  const currentExperiences = data.experiences || [];
-
+  // Buscar experiences atuais
+  const userDoc = await getDoc(userRef);
+  if (!userDoc.exists()) {
+    throw new Error('Usuário não encontrado');
+  }
+  
+  const userData = userDoc.data();
+  const currentExperiences = userData.experiences || [];
+  
+  // Garantir que tem ID único
   const newExperience = {
     ...experience,
     id: experience.id || `experience_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   };
-
+  
+  // ✅ REMOVER CAMPOS UNDEFINED
   const cleanExperience: CareerExperience = Object.keys(newExperience).reduce((acc, key) => {
     const value = (newExperience as any)[key];
-    if (value !== undefined) (acc as any)[key] = value;
+    if (value !== undefined) {
+      (acc as any)[key] = value;
+    }
     return acc;
   }, {} as CareerExperience);
-
+  
+  // Adicionar ao array manualmente
+  const updatedExperiences = [...currentExperiences, cleanExperience];
+  
   await updateDoc(userRef, {
-    experiences: [...currentExperiences, cleanExperience],
+    experiences: updatedExperiences,
     updatedAt: Timestamp.now(),
   });
 }
@@ -343,22 +264,29 @@ export async function updateExperience(
 ) {
   const userRef = doc(db, 'users', uid);
   
-  const userSnap = await getDoc(userRef);
-  if (!userSnap.exists()) throw new Error('Usuário não encontrado');
-
-  const data = userSnap.data();
-  const currentExperiences = data.experiences || [];
-
+  // Buscar experiences atuais
+  const userDoc = await getDoc(userRef);
+  if (!userDoc.exists()) {
+    throw new Error('Usuário não encontrado');
+  }
+  
+  const userData = userDoc.data();
+  const currentExperiences = userData.experiences || [];
+  
+  // ✅ REMOVER CAMPOS UNDEFINED
   const cleanExperience: CareerExperience = Object.keys(newExperience).reduce((acc, key) => {
     const value = (newExperience as any)[key];
-    if (value !== undefined) (acc as any)[key] = value;
+    if (value !== undefined) {
+      (acc as any)[key] = value;
+    }
     return acc;
   }, {} as CareerExperience);
-
+  
+  // Remover antiga e adicionar nova
   const updatedExperiences = currentExperiences
     .filter((exp: CareerExperience) => exp.id !== oldExperience.id)
     .concat(cleanExperience);
-
+  
   await updateDoc(userRef, {
     experiences: updatedExperiences,
     updatedAt: Timestamp.now(),
@@ -368,50 +296,64 @@ export async function updateExperience(
 export async function deleteExperience(uid: string, experience: CareerExperience) {
   const userRef = doc(db, 'users', uid);
   
-  const userSnap = await getDoc(userRef);
-  if (!userSnap.exists()) throw new Error('Usuário não encontrado');
-
-  const data = userSnap.data();
-  const updatedExperiences = (data.experiences || []).filter(
+  // Buscar experiences atuais
+  const userDoc = await getDoc(userRef);
+  if (!userDoc.exists()) {
+    throw new Error('Usuário não encontrado');
+  }
+  
+  const userData = userDoc.data();
+  const currentExperiences = userData.experiences || [];
+  
+  // Filtrar removendo a experience
+  const updatedExperiences = currentExperiences.filter(
     (exp: CareerExperience) => exp.id !== experience.id
   );
-
+  
   await updateDoc(userRef, {
     experiences: updatedExperiences,
     updatedAt: Timestamp.now(),
   });
 }
 
-// ============================================================
-// ================ ACHIEVEMENTS (CRUD) ========================
-// ============================================================
-
+// ✅ FUNÇÃO CORRIGIDA - addAchievement
 export async function addAchievement(uid: string, achievement: Achievement) {
   const userRef = doc(db, 'users', uid);
   
-  const userSnap = await getDoc(userRef);
-  if (!userSnap.exists()) throw new Error('Usuário não encontrado');
-
-  const data = userSnap.data();
-  const currentAchievements = data.achievements || [];
-
+  // Buscar achievements atuais
+  const userDoc = await getDoc(userRef);
+  if (!userDoc.exists()) {
+    throw new Error('Usuário não encontrado');
+  }
+  
+  const userData = userDoc.data();
+  const currentAchievements = userData.achievements || [];
+  
+  // Garantir que tem ID único
   const newAchievement = {
     ...achievement,
     id: achievement.id || `achievement_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   };
-
+  
+  // ✅ REMOVER CAMPOS UNDEFINED (Firestore não aceita)
   const cleanAchievement: Achievement = Object.keys(newAchievement).reduce((acc, key) => {
     const value = (newAchievement as any)[key];
-    if (value !== undefined) (acc as any)[key] = value;
+    if (value !== undefined) {
+      (acc as any)[key] = value;
+    }
     return acc;
   }, {} as Achievement);
-
+  
+  // Adicionar ao array manualmente (NÃO usar arrayUnion!)
+  const updatedAchievements = [...currentAchievements, cleanAchievement];
+  
   await updateDoc(userRef, {
-    achievements: [...currentAchievements, cleanAchievement],
+    achievements: updatedAchievements,
     updatedAt: Timestamp.now(),
   });
 }
 
+// ✅ FUNÇÃO CORRIGIDA - updateAchievement
 export async function updateAchievement(
   uid: string,
   oldAchievement: Achievement,
@@ -419,48 +361,60 @@ export async function updateAchievement(
 ) {
   const userRef = doc(db, 'users', uid);
   
-  const userSnap = await getDoc(userRef);
-  if (!userSnap.exists()) throw new Error('Usuário não encontrado');
-
-  const data = userSnap.data();
-  const currentAchievements = data.achievements || [];
-
+  // Buscar achievements atuais
+  const userDoc = await getDoc(userRef);
+  if (!userDoc.exists()) {
+    throw new Error('Usuário não encontrado');
+  }
+  
+  const userData = userDoc.data();
+  const currentAchievements = userData.achievements || [];
+  
+  // ✅ REMOVER CAMPOS UNDEFINED
   const cleanAchievement: Achievement = Object.keys(newAchievement).reduce((acc, key) => {
     const value = (newAchievement as any)[key];
-    if (value !== undefined) (acc as any)[key] = value;
+    if (value !== undefined) {
+      (acc as any)[key] = value;
+    }
     return acc;
   }, {} as Achievement);
-
+  
+  // Remover antigo e adicionar novo
   const updatedAchievements = currentAchievements
     .filter((ach: Achievement) => ach.id !== oldAchievement.id)
     .concat(cleanAchievement);
-
+  
   await updateDoc(userRef, {
     achievements: updatedAchievements,
     updatedAt: Timestamp.now(),
   });
 }
 
+// ✅ FUNÇÃO CORRIGIDA - deleteAchievement
 export async function deleteAchievement(uid: string, achievement: Achievement) {
   const userRef = doc(db, 'users', uid);
   
-  const userSnap = await getDoc(userRef);
-  if (!userSnap.exists()) throw new Error('Usuário não encontrado');
-
-  const data = userSnap.data();
-  const updatedAchievements = (data.achievements || []).filter(
+  // Buscar achievements atuais
+  const userDoc = await getDoc(userRef);
+  if (!userDoc.exists()) {
+    throw new Error('Usuário não encontrado');
+  }
+  
+  const userData = userDoc.data();
+  const currentAchievements = userData.achievements || [];
+  
+  // Filtrar removendo o achievement
+  const updatedAchievements = currentAchievements.filter(
     (ach: Achievement) => ach.id !== achievement.id
   );
-
+  
   await updateDoc(userRef, {
     achievements: updatedAchievements,
     updatedAt: Timestamp.now(),
   });
 }
 
-// ============================================================
-// ==================== OUTROS PERFIS =========================
-// ============================================================
+// ==================== FUNÇÕES DE CLUBE ====================
 
 export async function createClubeProfile(
   uid: string,
@@ -491,7 +445,11 @@ export async function getClubeProfile(uid: string): Promise<ClubeProfile | null>
     const userRef = doc(db, 'users', uid);
     const userSnap = await getDoc(userRef);
 
-    return userSnap.exists() ? (userSnap.data() as ClubeProfile) : null;
+    if (userSnap.exists()) {
+      return userSnap.data() as ClubeProfile;
+    }
+
+    return null;
   } catch (error) {
     console.error('Erro ao buscar perfil do clube:', error);
     return null;
@@ -508,6 +466,8 @@ export async function updateClubeProfile(
     updatedAt: Timestamp.now(),
   });
 }
+
+// ==================== FUNÇÕES DE TREINADOR ====================
 
 export async function createTreinadorProfile(
   uid: string,
@@ -536,7 +496,11 @@ export async function getTreinadorProfile(uid: string): Promise<TreinadorProfile
     const userRef = doc(db, 'users', uid);
     const userSnap = await getDoc(userRef);
 
-    return userSnap.exists() ? (userSnap.data() as TreinadorProfile) : null;
+    if (userSnap.exists()) {
+      return userSnap.data() as TreinadorProfile;
+    }
+
+    return null;
   } catch (error) {
     console.error('Erro ao buscar perfil do treinador:', error);
     return null;
@@ -553,6 +517,8 @@ export async function updateTreinadorProfile(
     updatedAt: Timestamp.now(),
   });
 }
+
+// ==================== FUNÇÕES DE AGENTE ====================
 
 export async function createAgenteProfile(
   uid: string,
@@ -581,7 +547,11 @@ export async function getAgenteProfile(uid: string): Promise<AgenteProfile | nul
     const userRef = doc(db, 'users', uid);
     const userSnap = await getDoc(userRef);
 
-    return userSnap.exists() ? (userSnap.data() as AgenteProfile) : null;
+    if (userSnap.exists()) {
+      return userSnap.data() as AgenteProfile;
+    }
+
+    return null;
   } catch (error) {
     console.error('Erro ao buscar perfil do agente:', error);
     return null;
@@ -598,6 +568,8 @@ export async function updateAgenteProfile(
     updatedAt: Timestamp.now(),
   });
 }
+
+// ==================== FUNÇÕES DE PATROCINADOR ====================
 
 export async function createPatrocinadorProfile(
   uid: string,
@@ -628,7 +600,11 @@ export async function getPatrocinadorProfile(uid: string): Promise<PatrocinadorP
     const userRef = doc(db, 'users', uid);
     const userSnap = await getDoc(userRef);
 
-    return userSnap.exists() ? (userSnap.data() as PatrocinadorProfile) : null;
+    if (userSnap.exists()) {
+      return userSnap.data() as PatrocinadorProfile;
+    }
+
+    return null;
   } catch (error) {
     console.error('Erro ao buscar perfil do patrocinador:', error);
     return null;
