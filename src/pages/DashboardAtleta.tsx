@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { AtletaProfile, CareerExperience, Achievement } from '../firebase/firestore';
 import { 
   getUserProfile, 
+  updateAtletaProfile,
   addExperience, 
   updateExperience, 
   deleteExperience,
@@ -55,21 +56,46 @@ export default function DashboardAtleta() {
   const [selectedClub, setSelectedClub] = useState<CareerExperience | null>(null);
 
   const loadProfile = async () => {
-    if (currentUser) {
-      try {
+    try {
+        if (!currentUser) return;   // ← ADICIONAR
+  
+        setLoading(true);
+  
         const profile = await getUserProfile(currentUser.uid);
-        setAtletaProfile(profile);
+  
+        if (profile) {
+  
+            const newHistoryEntry = {
+                date: new Date().toISOString(),
+                xp: profile.careerScore || 0,
+                reason: "Recalculo automático"
+            };
+  
+            await updateAtletaProfile(profile.uid, {
+                xpHistory: [
+                    ...(profile.xpHistory || []),
+                    newHistoryEntry
+                ]
+            });
+  
+            setAtletaProfile({
+                ...profile,
+                xpHistory: [
+                    ...(profile.xpHistory || []),
+                    newHistoryEntry
+                ]
+            });
+        }
+  
         setLoading(false);
-      } catch (error) {
-        console.error('Erro ao carregar perfil:', error);
-        setLoading(false);
-      }
+    } catch (error) {
+        console.error("Erro ao carregar perfil:", error);
     }
   };
-
+  
   useEffect(() => {
     loadProfile();
-  }, [currentUser]);
+  }, [currentUser]);  
 
   const handleSaveExperience = async (experience: CareerExperience) => {
     if (!currentUser) return;
@@ -732,7 +758,7 @@ export default function DashboardAtleta() {
 
             {activeSection === 'statistics' && <StatisticsSection />}
             {activeSection === 'xp-history' && (
-              <XPHistory history={atletaProfile?.xpHistory || []} />
+              <XPHistory history={atletaProfile?.xpHistory} />
             )}
             {activeSection === 'trajetoria' && (
               <div className="space-y-6">

@@ -76,7 +76,6 @@ export interface AtletaProfile extends UserProfile {
     xp: number;
     reason: string;
   }[];
-
   experiences?: CareerExperience[];
   achievements?: Achievement[];
   seeking?: ('clube' | 'patrocinio' | 'treinador')[];
@@ -649,6 +648,30 @@ export async function updatePatrocinadorProfile(
   const userRef = doc(db, 'users', uid);
   await updateDoc(userRef, {
     ...updates,
+    updatedAt: Timestamp.now(),
+  });
+}
+
+export async function addXPHistory(
+  uid: string,
+  entry: { xp: number; reason: string }
+) {
+  const userRef = doc(db, 'users', uid);
+
+  const userSnap = await getDoc(userRef);
+  if (!userSnap.exists()) return;
+
+  const data = userSnap.data();
+  const history = data.xpHistory || [];
+
+  const newEntry = {
+    date: new Date().toISOString(),
+    xp: entry.xp,
+    reason: entry.reason,
+  };
+
+  await updateDoc(userRef, {
+    xpHistory: [...history, newEntry],
     updatedAt: Timestamp.now(),
   });
 }

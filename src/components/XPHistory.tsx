@@ -1,44 +1,42 @@
-// src/gamification/XPHistory.tsx
+// src/components/XPHistory.tsx
 import React from "react";
 
-export interface XPEntry {
+interface XPItem {
   date: string;
   xp: number;
   reason: string;
 }
 
 interface XPHistoryProps {
-  history: XPEntry[] | undefined; // aceita undefined sem quebrar
+  history?: XPItem[];
 }
 
-export default function XPHistory({ history }: XPHistoryProps) {
-  if (!history || history.length === 0) {
-    return (
-      <div className="p-6 bg-gray-900 text-gray-300 rounded-xl border border-gray-700">
-        <p>Nenhum registro de XP encontrado.</p>
-      </div>
-    );
-  }
-
+export default function XPHistory({ history = [] }: XPHistoryProps) {
   return (
-    <div className="p-6 bg-gray-900 rounded-xl border border-gray-700">
-      <h2 className="text-xl font-bold text-white mb-4">Histórico de XP</h2>
+    <div className="space-y-4">
+      <h2 className="text-2xl font-bold text-white">Histórico de XP</h2>
 
-      <div className="space-y-4">
-        {history.map((entry, index) => (
+      {history.length === 0 && (
+        <div className="p-4 bg-gray-800 text-gray-400 rounded-lg">
+          Nenhum registro de XP encontrado.
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {history.map((item, idx) => (
           <div
-            key={index}
-            className="p-4 bg-gray-800 rounded-lg flex items-center justify-between border border-gray-700"
+            key={idx}
+            className="p-4 bg-gray-900/70 rounded-lg border border-gray-700 flex justify-between items-center"
           >
             <div>
-              <p className="text-white font-semibold">{entry.reason}</p>
-              <p className="text-gray-400 text-sm">
-                {new Date(entry.date).toLocaleDateString("pt-BR")}
+              <p className="text-white font-semibold">
+                {item.reason || "XP Adquirido"}
               </p>
+              <p className="text-gray-400 text-sm">{item.date}</p>
             </div>
 
             <span className="text-green-400 font-bold text-lg">
-              +{entry.xp} XP
+              +{item.xp} XP
             </span>
           </div>
         ))}
