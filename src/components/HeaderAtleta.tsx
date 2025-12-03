@@ -159,6 +159,18 @@ export default function HeaderAtleta({ atletaProfile, onMenuClick, onEditProfile
                       <User size={18} />
                       <span className="text-sm">Editar Perfil</span>
                     </button>
+                    
+                    <button
+                      onClick={() => {
+                        // redireciona para o perfil público
+                        window.open(`/perfil/${atletaProfile.uid}`, "_blank");
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2 text-gray-300 hover:bg-gray-700 transition-colors"
+                    >
+                      <User size={18} />
+                      <span className="text-sm">Ver Perfil Público</span>
+                    </button>
+
                     <button className="w-full flex items-center gap-3 px-4 py-2 text-gray-300 hover:bg-gray-700 transition-colors">
                       <Settings size={18} />
                       <span className="text-sm">Configurações</span>
