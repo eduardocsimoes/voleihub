@@ -4,6 +4,8 @@ import LandingPage from './pages/LandingPage';
 import DashboardRouter from './pages/DashboardRouter';
 import PublicAthleteProfile from "./pages/PublicProfile";
 import PerfilPublicoAtletaPDF from "./pages/PerfilPublicoAtletaPDF";
+import FeedAtletas from "./pages/FeedAtletas";
+import FeedPerfilAtleta from "./pages/FeedPerfilAtleta";
 
 export default function App() {
   return (
@@ -20,6 +22,10 @@ export default function App() {
           <Route path="/perfil/:id" element={<PublicAthleteProfile />} />
 
           <Route path="/perfil-pdf/:id" element={<PerfilPublicoAtletaPDF />} />
+
+          {/* 🔵 ROTAS DO FEED */}
+          <Route path="/feed" element={<FeedAtletas />} />
+          <Route path="/feed/perfil/:uid" element={<FeedPerfilAtleta />} />
 
           {/* Redirecionar qualquer rota desconhecida para home */}
           <Route path="*" element={<Navigate to="/" />} />
