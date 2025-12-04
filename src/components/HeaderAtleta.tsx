@@ -171,6 +171,17 @@ export default function HeaderAtleta({ atletaProfile, onMenuClick, onEditProfile
                       <span className="text-sm">Ver Perfil Público</span>
                     </button>
 
+                    {/* Gerar currículo em PDF */}
+                    <button
+                      onClick={() => {
+                        window.open(`/perfil-pdf/${atletaProfile.uid}`, "_blank");
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2 text-gray-300 hover:bg-gray-700 transition-colors"
+                    >
+                      <Settings size={18} />
+                      <span className="text-sm">Gerar Currículo (PDF)</span>
+                    </button>
+
                     <button className="w-full flex items-center gap-3 px-4 py-2 text-gray-300 hover:bg-gray-700 transition-colors">
                       <Settings size={18} />
                       <span className="text-sm">Configurações</span>

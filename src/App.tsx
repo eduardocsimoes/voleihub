@@ -3,6 +3,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import LandingPage from './pages/LandingPage';
 import DashboardRouter from './pages/DashboardRouter';
 import PublicAthleteProfile from "./pages/PublicProfile";
+import PerfilPublicoAtletaPDF from "./pages/PerfilPublicoAtletaPDF";
 
 export default function App() {
   return (
@@ -17,6 +18,8 @@ export default function App() {
           
           {/* Rota pública do atleta */}
           <Route path="/perfil/:id" element={<PublicAthleteProfile />} />
+
+          <Route path="/perfil-pdf/:id" element={<PerfilPublicoAtletaPDF />} />
 
           {/* Redirecionar qualquer rota desconhecida para home */}
           <Route path="*" element={<Navigate to="/" />} />

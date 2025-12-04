@@ -1,5 +1,6 @@
 // src/pages/PerfilPublicoAtleta.tsx
 import React, { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import {
   AtletaProfile,
   Achievement,
@@ -124,40 +125,42 @@ function agruparCarreira(achievements: Achievement[]): GrupoCarreira[] {
 }
 
 export default function PerfilPublicoAtleta() {
+  const { id: uid } = useParams();
   const [atleta, setAtleta] = useState<AtletaProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
+  const isPDF = window.location.search.includes("pdf=1");
 
   useEffect(() => {
-    const search = new URLSearchParams(window.location.search);
-    const uid = search.get("id");
-
     if (!uid) {
       setErro("Perfil não encontrado. Link inválido.");
       setLoading(false);
       return;
     }
 
+    if (isPDF) {
+      setTimeout(() => {
+        window.print();
+      }, 800);
+    }
+
     const carregar = async () => {
       try {
-        setLoading(true);
         const perfil = await getUserProfile(uid);
         if (!perfil) {
           setErro("Perfil não encontrado ou não está disponível publicamente.");
-          setLoading(false);
           return;
         }
         setAtleta(perfil);
-      } catch (error) {
-        console.error("Erro ao carregar perfil público:", error);
-        setErro("Ocorreu um erro ao carregar o perfil.");
+      } catch {
+        setErro("Erro ao carregar perfil.");
       } finally {
         setLoading(false);
       }
     };
 
     carregar();
-  }, []);
+  }, [uid]);
 
   if (loading) {
     return (
