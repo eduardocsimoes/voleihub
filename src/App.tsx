@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import LandingPage from './pages/LandingPage';
 import DashboardRouter from './pages/DashboardRouter';
-import PublicAthleteProfile from "./pages/PublicProfile";
+import PublicAthleteProfile from "./pages/PerfilPublicoAtleta";
 import PerfilPublicoAtletaPDF from "./pages/PerfilPublicoAtletaPDF";
 import FeedAtletas from "./pages/FeedAtletas";
 import FeedPerfilAtleta from "./pages/FeedPerfilAtleta";
