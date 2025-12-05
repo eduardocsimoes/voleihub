@@ -1,13 +1,13 @@
 // src/pages/PerfilPublicoAtleta.tsx
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-
 import { auth } from "../firebase/config";
 import {
   followUser,
   unfollowUser,
   isFollowing,
   getFollowersCount,
+  getFollowingCount
 } from "../firebase/follow";
 
 import {
@@ -155,6 +155,7 @@ export default function PerfilPublicoAtleta() {
   const usuarioAtual = auth.currentUser?.uid || null;
   const [isSeguindo, setIsSeguindo] = useState(false);
   const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
 
   /* ----- carregar perfil ----- */
   useEffect(() => {
@@ -192,10 +193,13 @@ export default function PerfilPublicoAtleta() {
   useEffect(() => {
     async function loadFollow() {
       if (!uid) return;
-
-      const count = await getFollowersCount(uid);
-      setFollowersCount(count);
-
+  
+      const countFollowers = await getFollowersCount(uid);
+      setFollowersCount(countFollowers);
+  
+      const countFollowing = await getFollowingCount(uid);
+      setFollowingCount(countFollowing);
+  
       if (usuarioAtual && usuarioAtual !== uid) {
         const followState = await isFollowing(usuarioAtual, uid);
         setIsSeguindo(followState);
@@ -203,7 +207,7 @@ export default function PerfilPublicoAtleta() {
     }
     loadFollow();
   }, [uid, usuarioAtual]);
-
+  
   async function toggleFollow() {
     if (!usuarioAtual) {
       alert("Você precisa estar logado para seguir atletas.");
@@ -322,95 +326,126 @@ export default function PerfilPublicoAtleta() {
 
       <main className="flex-1">
         <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-          {/* HERO / CABEÇALHO */}
-          <section className="bg-gradient-to-br from-gray-800/90 via-gray-900/90 to-black/90 border border-gray-700/70 rounded-3xl overflow-hidden shadow-xl">
-            <div className="h-28 bg-gradient-to-r from-orange-500/30 via-purple-600/30 to-blue-500/30" />
 
-            <div className="p-6 sm:p-8 -mt-16 flex flex-col sm:flex-row gap-6 sm:gap-8 items-start sm:items-end">
-              {/* Foto / iniciais */}
-              <div className="relative">
-                <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-2xl border-4 border-gray-900 bg-gradient-to-br from-orange-500 to-red-600 overflow-hidden shadow-2xl flex items-center justify-center text-4xl sm:text-5xl font-bold">
-                  {atleta.photoURL ? (
-                    <img
-                      src={atleta.photoURL}
-                      alt={atleta.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span>{atleta.name.charAt(0).toUpperCase()}</span>
-                  )}
-                </div>
-                {clubeAtual && (
-                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-orange-500 text-xs font-semibold px-3 py-1 rounded-full shadow-lg">
-                    Atleta em atividade
-                  </div>
+        {/* HERO / CABEÇALHO */}
+        <section className="bg-gradient-to-br from-gray-800/90 via-gray-900/90 to-black/90 border border-gray-700/70 rounded-3xl overflow-hidden shadow-xl">
+          <div className="h-28 bg-gradient-to-r from-orange-500/30 via-purple-600/30 to-blue-500/30" />
+
+          <div className="p-6 sm:p-8 -mt-16 flex flex-col sm:flex-row gap-6 sm:gap-8 items-start sm:items-end">
+            
+            {/* FOTO */}
+            <div className="relative">
+              <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-2xl border-4 border-gray-900 bg-gradient-to-br from-orange-500 to-red-600 overflow-hidden shadow-2xl flex items-center justify-center text-4xl sm:text-5xl font-bold">
+                {atleta.photoURL ? (
+                  <img src={atleta.photoURL} alt={atleta.name} className="w-full h-full object-cover" />
+                ) : (
+                  <span>{atleta.name.charAt(0).toUpperCase()}</span>
                 )}
               </div>
 
-              {/* Infos principais */}
-              <div className="flex-1 w-full">
-                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <User size={20} className="text-orange-400" />
-                      <h1 className="text-2xl sm:text-3xl font-bold">
-                        {atleta.name}
-                      </h1>
-                    </div>
-                    <div className="flex flex-wrap gap-2 text-xs sm:text-sm text-gray-300">
-                      {atleta.position && (
-                        <span className="px-3 py-1 rounded-full bg-gray-800 border border-gray-600/70">
-                          Posição: <strong>{atleta.position}</strong>
-                        </span>
-                      )}
-                      {idade !== null && (
-                        <span className="px-3 py-1 rounded-full bg-gray-800 border border-gray-600/70">
-                          {idade} anos
-                        </span>
-                      )}
-                      {clubeAtual && (
-                        <span className="px-3 py-1 rounded-full bg-gray-800 border border-gray-600/70">
-                          Clube atual: <strong>{clubeAtual.clubName}</strong>
-                        </span>
-                      )}
-                      {atleta.city && (
-                        <span className="px-3 py-1 rounded-full bg-gray-800 border border-gray-600/70 inline-flex items-center gap-1">
-                          <MapPin size={14} />
-                          {atleta.city}/{atleta.state}
-                        </span>
-                      )}
-                    </div>
+              {clubeAtual && (
+                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-orange-500 text-xs font-semibold px-3 py-1 rounded-full shadow-lg">
+                  Atleta em atividade
+                </div>
+              )}
+            </div>
+
+            {/* INFORMAÇÕES PRINCIPAIS */}
+            <div className="flex-1 w-full">
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-4">
+                
+                {/* Nome e tags */}
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <User size={20} className="text-orange-400" />
+                    <h1 className="text-2xl sm:text-3xl font-bold">{atleta.name}</h1>
                   </div>
 
-                  {/* Bloco de seguir + contagem */}
-                  <div className="flex flex-col items-end gap-1">
-                    {usuarioAtual && uid && usuarioAtual !== uid && (
-                      <button
-                        onClick={toggleFollow}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-md 
-                          ${
-                            isSeguindo
-                              ? "bg-gray-700 text-gray-200 hover:bg-gray-600"
-                              : "bg-blue-600 text-white hover:bg-blue-700"
-                          }`}
-                      >
-                        {isSeguindo ? (
-                          <>
-                            <UserCheck size={16} />
-                            Seguindo
-                          </>
-                        ) : (
-                          <>
-                            <UserPlus size={16} />
-                            Seguir
-                          </>
-                        )}
-                      </button>
+                  <div className="flex items-center gap-4 mt-1 text-gray-300 text-sm">
+                    <button className="hover:text-white transition">
+                      <strong>{followersCount}</strong> seguidores
+                    </button>
+
+                    <button className="hover:text-white transition">
+                      <strong>{followingCount}</strong> seguindo
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 text-xs sm:text-sm text-gray-300">
+                    {atleta.position && (
+                      <span className="px-3 py-1 rounded-full bg-gray-800 border border-gray-600/70">
+                        Posição: <strong>{atleta.position}</strong>
+                      </span>
                     )}
 
-                    <p className="text-xs text-gray-400">{labelSeguidores}</p>
+                    {idade !== null && (
+                      <span className="px-3 py-1 rounded-full bg-gray-800 border border-gray-600/70">
+                        {idade} anos
+                      </span>
+                    )}
+
+                    {clubeAtual && (
+                      <span className="px-3 py-1 rounded-full bg-gray-800 border border-gray-600/70">
+                        Clube atual: <strong>{clubeAtual.clubName}</strong>
+                      </span>
+                    )}
+
+                    {atleta.city && (
+                      <span className="px-3 py-1 rounded-full bg-gray-800 border border-gray-600/70 inline-flex items-center gap-1">
+                        <MapPin size={14} />
+                        {atleta.city}/{atleta.state}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* ==== NOVO BLOCO: Seguidores / Seguindo ==== */}
+                  <div className="flex items-center gap-6 mt-3">
+                    <button className="text-left">
+                      <p className="text-gray-300 text-xs">Seguidores</p>
+                      <p className="text-white text-lg font-bold">{followersCount}</p>
+                    </button>
+
+                    <button className="text-left">
+                      <p className="text-gray-300 text-xs">Seguindo</p>
+                      <p className="text-white text-lg font-bold">{followingCount}</p>
+                    </button>
                   </div>
                 </div>
+
+                {/* Botão Seguir */}
+                {usuarioAtual && usuarioAtual !== uid && (
+                  <button
+                    onClick={toggleFollow}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all shadow-md 
+                      ${isSeguindo 
+                        ? "bg-gray-700 text-gray-200 hover:bg-gray-600" 
+                        : "bg-blue-600 text-white hover:bg-blue-700"}`}
+                  >
+                    <User size={16} />
+                    {isSeguindo ? "Seguindo" : "Seguir"}
+                  </button>
+                )}
+
+                {/* SEGUIDORES / SEGUINDO */}
+                <div className="flex gap-6 mt-6">
+                  <button
+                    onClick={() => (window.location.href = `/perfil/${uid}/seguidores`)}
+                    className="text-left"
+                  >
+                    <p className="text-xl font-bold">{followersCount}</p>
+                    <p className="text-sm text-gray-400">Seguidores</p>
+                  </button>
+
+                  <button
+                    onClick={() => (window.location.href = `/perfil/${uid}/seguindo`)}
+                    className="text-left"
+                  >
+                    <p className="text-xl font-bold">{followingCount}</p>
+                    <p className="text-sm text-gray-400">Seguindo</p>
+                  </button>
+                </div>
+
+              </div>
 
                 {/* Card de nível / gamificação */}
                 <div className="bg-gradient-to-br from-purple-600/40 to-indigo-600/40 border border-purple-400/60 rounded-2xl px-4 py-3 text-sm shadow-lg w-full sm:w-64">

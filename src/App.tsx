@@ -6,6 +6,13 @@ import PublicAthleteProfile from "./pages/PerfilPublicoAtleta";
 import PerfilPublicoAtletaPDF from "./pages/PerfilPublicoAtletaPDF";
 import FeedAtletas from "./pages/FeedAtletas";
 import FeedPerfilAtleta from "./pages/FeedPerfilAtleta";
+import PerfilPublicoAtleta from "./pages/PerfilPublicoAtleta";
+import {
+  SeguidoresAtletaPage,
+  SeguindoAtletaPage,
+} from "./pages/SeguidoresSeguindoAtleta";
+import SeguidoresAtleta from "./pages/SeguidoresAtleta";
+import SeguindoAtleta from "./pages/SeguindoAtleta";
 
 export default function App() {
   return (
@@ -26,6 +33,16 @@ export default function App() {
           {/* 🔵 ROTAS DO FEED */}
           <Route path="/feed" element={<FeedAtletas />} />
           <Route path="/feed/perfil/:uid" element={<FeedPerfilAtleta />} />
+
+          {/* Perfil público */}
+          <Route path="/perfil/:id" element={<PerfilPublicoAtleta />} />
+
+          {/* Listas de seguidores / seguindo
+          <Route path="/perfil/:id/seguidores" element={<SeguidoresAtletaPage />} />
+          <Route path="/perfil/:id/seguindo" element={<SeguindoAtletaPage />} />*/}
+
+          <Route path="/perfil/:id/seguidores" element={<SeguidoresAtleta />} />
+          <Route path="/perfil/:id/seguindo" element={<SeguindoAtleta />} />
 
           {/* Redirecionar qualquer rota desconhecida para home */}
           <Route path="*" element={<Navigate to="/" />} />
