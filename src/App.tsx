@@ -7,6 +7,9 @@ import PerfilPublicoAtletaPDF from "./pages/PerfilPublicoAtletaPDF";
 import FeedAtletas from "./pages/FeedAtletas";
 import FeedPerfilAtleta from "./pages/FeedPerfilAtleta";
 import PerfilPublicoAtleta from "./pages/PerfilPublicoAtleta";
+import PhysicalEvolutionMenu from "./pages/evolucao/PhysicalEvolutionMenu";
+import AlturaAtleta from "./pages/evolucao/AlturaAtleta";
+
 import {
   SeguidoresAtletaPage,
   SeguindoAtletaPage,
@@ -43,6 +46,13 @@ export default function App() {
 
           <Route path="/perfil/:id/seguidores" element={<SeguidoresAtleta />} />
           <Route path="/perfil/:id/seguindo" element={<SeguindoAtleta />} />
+
+          <Route path="/evolucao" element={<PhysicalEvolutionMenu />} />
+          <Route path="/evolucao/altura" element={<AlturaAtleta />} />
+          <Route path="/evolucao/salto" element={<div>Em breve</div>} />
+          <Route path="/evolucao/alcance" element={<div>Em breve</div>} />
+          {/* <Route path="/evolucao/envergadura" element={<EnvergaduraPage />} />
+          <Route path="/evolucao/forca" element={<ForcaPage />} /> */}
 
           {/* Redirecionar qualquer rota desconhecida para home */}
           <Route path="*" element={<Navigate to="/" />} />

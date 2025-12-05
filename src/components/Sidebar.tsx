@@ -5,7 +5,11 @@ import {
   Crown,
   Award,
   TrendingUp,
-  BarChart3, 
+  BarChart3,
+  Ruler,
+  Activity,
+  MoveUpRight,
+  Zap,
   Trophy, 
   Image, 
   FileText, 
@@ -32,9 +36,17 @@ const menuItems = [
   { id: 'ranking-atletas', label: 'Ranking de Atletas', icon: Crown },
   { id: 'ranking', label: 'Ranking Global', icon: Award },
   { id: 'xp-history', label: 'Histórico de XP', icon: TrendingUp },
+  { id: 'evolucao-fisica', label: 'Evolução Física', icon: BarChart3 },
 
+  { id: 'fisica-title', label: 'Evolução Física', icon: null, isTitle: true },
+  { id: 'altura', label: 'Altura', icon: Ruler },
+  { id: 'salto', label: 'Salto (VJ)', icon: MoveUpRight },
+  { id: 'envergadura', label: 'Envergadura & Alcance', icon: Activity },
+  { id: 'forca-velocidade', label: 'Força & Velocidade', icon: Zap },
+  
   { id: 'gallery', label: 'Galeria', icon: Image },
   { id: 'documents', label: 'Documentos', icon: FileText },
+
   { id: 'messages', label: 'Mensagens', icon: MessageSquare, badge: 3 },
   { id: 'settings', label: 'Configurações', icon: Settings },
 ];
@@ -42,7 +54,6 @@ const menuItems = [
 export default function Sidebar({ isOpen, setIsOpen, activeSection, setActiveSection }: SidebarProps) {
   return (
     <>
-      {/* Overlay para mobile */}
       {isOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
@@ -50,7 +61,6 @@ export default function Sidebar({ isOpen, setIsOpen, activeSection, setActiveSec
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={`
           fixed top-0 left-0 h-full bg-gray-900/95 backdrop-blur-sm border-r border-orange-500/20
@@ -59,7 +69,6 @@ export default function Sidebar({ isOpen, setIsOpen, activeSection, setActiveSec
           ${isOpen ? 'w-64' : 'lg:w-20'}
         `}
       >
-        {/* Toggle Button */}
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="absolute -right-3 top-6 bg-orange-500 text-white p-1 rounded-full shadow-lg hover:bg-orange-600 transition-colors hidden lg:block"
@@ -67,7 +76,6 @@ export default function Sidebar({ isOpen, setIsOpen, activeSection, setActiveSec
           {isOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
         </button>
 
-        {/* Logo */}
         <div className="p-4 border-b border-orange-500/20">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -82,19 +90,38 @@ export default function Sidebar({ isOpen, setIsOpen, activeSection, setActiveSec
           </div>
         </div>
 
-        {/* Menu Items */}
         <nav className="p-3 space-y-1">
           {menuItems.map((item) => {
+            // Título de seção
+            if (item.isTitle) {
+              return (
+                <div 
+                  key={item.id}
+                  className="pt-4 pb-1 text-xs font-bold text-orange-400 uppercase tracking-wide opacity-80"
+                >
+                  {isOpen ? item.label : ''}
+                </div>
+              );
+            }
+
             const Icon = item.icon;
             const isActive = activeSection === item.id;
 
             return (
               <button
                 key={item.id}
+                
                 onClick={() => {
                   setActiveSection(item.id);
+                  
+                  if (item.id === "evolucao-fisica") {
+                    window.location.href = "/evolucao";   // 🔥 Navega para o dashboard
+                    return;
+                  }
+                
                   if (window.innerWidth < 1024) setIsOpen(false);
                 }}
+
                 className={`
                   w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
                   transition-all duration-200 group relative
@@ -104,7 +131,8 @@ export default function Sidebar({ isOpen, setIsOpen, activeSection, setActiveSec
                   }
                 `}
               >
-                <Icon size={20} className="flex-shrink-0" />
+                {Icon && <Icon size={20} className="flex-shrink-0" />}
+
                 {isOpen && (
                   <>
                     <span className="font-medium">{item.label}</span>
@@ -116,8 +144,7 @@ export default function Sidebar({ isOpen, setIsOpen, activeSection, setActiveSec
                   </>
                 )}
 
-                {/* Tooltip */}
-                {!isOpen && (
+                {!isOpen && !item.isTitle && (
                   <div className="absolute left-full ml-2 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
                     {item.label}
                     {item.badge && (
@@ -132,7 +159,6 @@ export default function Sidebar({ isOpen, setIsOpen, activeSection, setActiveSec
           })}
         </nav>
 
-        {/* User Info (bottom) */}
         {isOpen && (
           <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-orange-500/20">
             <div className="flex items-center gap-3 text-sm">

@@ -2,9 +2,13 @@ import {
   doc, 
   setDoc, 
   getDoc, 
+  getDocs,
   updateDoc, 
   arrayUnion, 
   arrayRemove,
+  collection,
+  query,
+  orderBy,
   Timestamp 
 } from 'firebase/firestore';
 import { db } from './config';
@@ -386,6 +390,59 @@ export async function deleteExperience(uid: string, experience: CareerExperience
     experiences: updatedExperiences,
     updatedAt: Timestamp.now(),
   });
+}
+
+function calculateAgeFromBirthdate(birthDate: string, measurementDate: string) {
+  const birth = new Date(birthDate);
+  const measure = new Date(measurementDate);
+
+  let age = measure.getFullYear() - birth.getFullYear();
+  const m = measure.getMonth() - birth.getMonth();
+
+  if (m < 0 || (m === 0 && measure.getDate() < birth.getDate())) {
+    age--;
+  }
+
+  return age;
+}
+
+/** Registrar nova altura */
+export async function addHeightRecord(
+  uid: string,
+  height: number,
+  date: string
+) {
+  const ref = doc(
+    collection(db, "users", uid, "heightRecords")
+  );
+
+  // pegar birthDate do perfil do atleta
+  const userSnap = await getDoc(doc(db, "users", uid));
+  const birthDate = userSnap.data()?.birthDate;
+
+  const age = calculateAgeFromBirthdate(birthDate, date);
+
+  await setDoc(ref, {
+    height,
+    date,
+    ageAtMeasurement: age,
+    createdAt: Timestamp.now(),
+  });
+}
+
+/** Listar histórico completo */
+export async function getHeightHistory(uid: string) {
+  const q = query(
+    collection(db, "users", uid, "heightRecords"),
+    orderBy("date", "asc")
+  );
+
+  const snap = await getDocs(q);
+
+  return snap.docs.map((d) => ({
+    id: d.id,
+    ...d.data()
+  }));
 }
 
 // ============================================================
