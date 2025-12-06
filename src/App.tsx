@@ -44,14 +44,14 @@ export default function App() {
           <Route path="/perfil/:id/seguidores" element={<SeguidoresAtletaPage />} />
           <Route path="/perfil/:id/seguindo" element={<SeguindoAtletaPage />} />*/}
 
-          <Route path="/perfil/:id/seguidores" element={<SeguidoresAtleta />} />
+          {/* <Route path="/perfil/:id/seguidores" element={<SeguidoresAtleta />} />
           <Route path="/perfil/:id/seguindo" element={<SeguindoAtleta />} />
 
           <Route path="/evolucao" element={<PhysicalEvolutionMenu />} />
           <Route path="/evolucao/altura" element={<AlturaAtleta />} />
           <Route path="/evolucao/salto" element={<div>Em breve</div>} />
           <Route path="/evolucao/alcance" element={<div>Em breve</div>} />
-          {/* <Route path="/evolucao/envergadura" element={<EnvergaduraPage />} />
+          <Route path="/evolucao/envergadura" element={<EnvergaduraPage />} />
           <Route path="/evolucao/forca" element={<ForcaPage />} /> */}
 
           {/* Redirecionar qualquer rota desconhecida para home */}

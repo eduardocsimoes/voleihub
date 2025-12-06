@@ -36,9 +36,14 @@ const menuItems = [
   { id: 'ranking-atletas', label: 'Ranking de Atletas', icon: Crown },
   { id: 'ranking', label: 'Ranking Global', icon: Award },
   { id: 'xp-history', label: 'Histórico de XP', icon: TrendingUp },
+
+  // 🔥 Evolução Física (MENU PRINCIPAL, igual Trajetória)
   { id: 'evolucao-fisica', label: 'Evolução Física', icon: BarChart3 },
 
+  // Título da categoria
   { id: 'fisica-title', label: 'Evolução Física', icon: null, isTitle: true },
+
+  // Subcategorias
   { id: 'altura', label: 'Altura', icon: Ruler },
   { id: 'salto', label: 'Salto (VJ)', icon: MoveUpRight },
   { id: 'envergadura', label: 'Envergadura & Alcance', icon: Activity },
@@ -46,7 +51,6 @@ const menuItems = [
   
   { id: 'gallery', label: 'Galeria', icon: Image },
   { id: 'documents', label: 'Documentos', icon: FileText },
-
   { id: 'messages', label: 'Mensagens', icon: MessageSquare, badge: 3 },
   { id: 'settings', label: 'Configurações', icon: Settings },
 ];
@@ -92,7 +96,8 @@ export default function Sidebar({ isOpen, setIsOpen, activeSection, setActiveSec
 
         <nav className="p-3 space-y-1">
           {menuItems.map((item) => {
-            // Título de seção
+
+            // ⭐ Se for título de categoria
             if (item.isTitle) {
               return (
                 <div 
@@ -113,12 +118,8 @@ export default function Sidebar({ isOpen, setIsOpen, activeSection, setActiveSec
                 
                 onClick={() => {
                   setActiveSection(item.id);
-                  
-                  if (item.id === "evolucao-fisica") {
-                    window.location.href = "/evolucao";   // 🔥 Navega para o dashboard
-                    return;
-                  }
-                
+
+                  // Fecha menu no mobile
                   if (window.innerWidth < 1024) setIsOpen(false);
                 }}
 

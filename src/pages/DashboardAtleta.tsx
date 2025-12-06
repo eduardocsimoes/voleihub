@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { AtletaProfile, CareerExperience, Achievement } from '../firebase/firestore';
 import PerfilCompletoAtleta from "./PerfilCompletoAtleta";
+import { auth } from "../firebase/config";
 import { 
   getUserProfile, 
   updateAtletaProfile,
@@ -39,7 +40,8 @@ import CarreiraTimeline from '../components/CarreiraTimeline';
 import TimelineHorizontal from '../components/TimelineHorizontal';
 import RankingAtletas from "./RankingAtletas";
 import XPHistory from "../components/XPHistory";
-
+import PhysicalEvolutionMenu from "./evolucao/PhysicalEvolutionMenu";
+import AlturaAtleta from "./evolucao/AlturaAtleta";
 
 // 🔥 Gamificação
 import { calculateAthleteGamification } from '../gamification/gamification';
@@ -793,6 +795,15 @@ export default function DashboardAtleta() {
                 />
               </div>
             )}
+            
+            {activeSection === "evolucao-fisica" && (
+              <PhysicalEvolutionMenu
+                onNavigate={(sec) => setActiveSection(sec)}
+              />
+            )}
+
+            {activeSection === 'altura' && <AlturaAtleta />}
+            
             {activeSection === 'achievements' && (<BadgesSection atletaProfile={atletaProfile ?? null} />)}
             {activeSection === 'ranking-atletas' && <RankingAtletas />}
 

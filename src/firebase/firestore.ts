@@ -406,31 +406,23 @@ function calculateAgeFromBirthdate(birthDate: string, measurementDate: string) {
   return age;
 }
 
-/** Registrar nova altura */
+/** Registrar altura */
 export async function addHeightRecord(
   uid: string,
   height: number,
   date: string
 ) {
-  const ref = doc(
-    collection(db, "users", uid, "heightRecords")
-  );
+  const heightRef = collection(db, "users", uid, "heightRecords");
 
-  // pegar birthDate do perfil do atleta
-  const userSnap = await getDoc(doc(db, "users", uid));
-  const birthDate = userSnap.data()?.birthDate;
-
-  const age = calculateAgeFromBirthdate(birthDate, date);
-
-  await setDoc(ref, {
+  await setDoc(doc(heightRef), {
     height,
     date,
-    ageAtMeasurement: age,
     createdAt: Timestamp.now(),
   });
 }
 
-/** Listar histórico completo */
+
+/** Listar histórico de altura */
 export async function getHeightHistory(uid: string) {
   const q = query(
     collection(db, "users", uid, "heightRecords"),
@@ -441,7 +433,7 @@ export async function getHeightHistory(uid: string) {
 
   return snap.docs.map((d) => ({
     id: d.id,
-    ...d.data()
+    ...d.data(),
   }));
 }
 
