@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { auth } from "../../firebase/config";
-import { addHeightRecord, getHeightHistory } from "../../firebase/firestore";
+import { 
+  addHeightRecord, 
+  deleteHeightRecord, 
+  getHeightHistory 
+} from "../../firebase/firestore";
+import { Trash2 } from "lucide-react";
 
 export default function AlturaAtleta() {
   const usuarioAtual = auth.currentUser?.uid;
@@ -10,6 +15,7 @@ export default function AlturaAtleta() {
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Carregar histórico ao abrir
   useEffect(() => {
     async function loadHistory() {
       if (!usuarioAtual) {
@@ -24,8 +30,9 @@ export default function AlturaAtleta() {
     }
 
     loadHistory();
-  }, []);
+  }, [usuarioAtual]);
 
+  // Salvar registro
   async function salvar() {
     if (!usuarioAtual) {
       alert("Você precisa estar logado.");
@@ -38,13 +45,25 @@ export default function AlturaAtleta() {
     }
 
     await addHeightRecord(usuarioAtual, Number(height), date);
-    alert("Altura registrada com sucesso!");
 
     const lista = await getHeightHistory(usuarioAtual);
     setHistory(lista);
 
     setHeight("");
     setDate("");
+  }
+
+  // Excluir registro
+  async function excluir(id: string) {
+    if (!usuarioAtual) return;
+
+    const confirmar = confirm("Deseja realmente excluir este registro?");
+    if (!confirmar) return;
+
+    await deleteHeightRecord(usuarioAtual, id);
+
+    const lista = await getHeightHistory(usuarioAtual);
+    setHistory(lista);
   }
 
   return (
@@ -58,11 +77,10 @@ export default function AlturaAtleta() {
         </p>
       </div>
 
-      {/* FORM */}
+      {/* Formulário */}
       <div className="bg-gray-900/70 border border-gray-700 rounded-2xl p-6 space-y-5">
         <h2 className="text-lg font-semibold text-white">Registrar nova altura</h2>
 
-        {/* Altura */}
         <input
           type="number"
           value={height}
@@ -71,7 +89,6 @@ export default function AlturaAtleta() {
           className="w-full px-4 py-3 rounded-lg bg-gray-800 border border-gray-600 text-white text-lg"
         />
 
-        {/* Data */}
         <input
           type="date"
           value={date}
@@ -79,7 +96,6 @@ export default function AlturaAtleta() {
           className="w-full px-4 py-3 rounded-lg bg-gray-800 border border-gray-600 text-white text-lg"
         />
 
-        {/* Botão */}
         <button
           onClick={salvar}
           className="w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-600 font-semibold text-white text-lg transition"
@@ -88,7 +104,7 @@ export default function AlturaAtleta() {
         </button>
       </div>
 
-      {/* HISTÓRICO */}
+      {/* Histórico */}
       <div className="bg-gray-900/70 border border-gray-700 rounded-2xl p-6 space-y-5">
         <h2 className="text-lg font-semibold text-white">Histórico de Medidas</h2>
 
@@ -108,11 +124,17 @@ export default function AlturaAtleta() {
                 <div>
                   <p className="text-white font-bold text-lg">{h.height} cm</p>
                   <p className="text-xs text-gray-400">Data: {h.date}</p>
+                  <p className="text-xs text-gray-400">
+                    Idade: {h.ageAtMeasurement ?? "–"} anos
+                  </p>
                 </div>
 
-                <p className="text-sm text-gray-300">
-                  Idade: {h.ageAtMeasurement ?? "–"} anos
-                </p>
+                <button
+                  onClick={() => excluir(h.id)}
+                  className="text-red-400 hover:text-red-600 transition"
+                >
+                  <Trash2 size={20} />
+                </button>
               </div>
             ))}
           </div>

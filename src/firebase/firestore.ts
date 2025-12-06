@@ -4,6 +4,7 @@ import {
   getDoc, 
   getDocs,
   updateDoc, 
+  deleteDoc,
   arrayUnion, 
   arrayRemove,
   collection,
@@ -421,8 +422,6 @@ export async function addHeightRecord(
   });
 }
 
-
-/** Listar histórico de altura */
 export async function getHeightHistory(uid: string) {
   const q = query(
     collection(db, "users", uid, "heightRecords"),
@@ -433,8 +432,13 @@ export async function getHeightHistory(uid: string) {
 
   return snap.docs.map((d) => ({
     id: d.id,
-    ...d.data(),
+    ...d.data()
   }));
+}
+
+export async function deleteHeightRecord(uid: string, recordId: string) {
+  const ref = doc(db, "users", uid, "heightRecords", recordId);
+  await deleteDoc(ref);
 }
 
 // ============================================================
