@@ -75,6 +75,10 @@ export interface AtletaProfile extends UserProfile {
   phone?: string;
   bio?: string;
 
+  fatherHeight?: number; // altura do pai (cm)
+  motherHeight?: number; // altura da mãe (cm)
+  sex?: 'M' | 'F';       // sexo do atleta (M/F)
+
   // Histórico futuro de XP (se quiser log de evoluções)
   xpHistory?: {
     date: string;
@@ -276,6 +280,9 @@ export async function getUserProfile(uid: string): Promise<AtletaProfile | null>
         state: data.state,
         phone: data.phone,
         bio: data.bio,
+        fatherHeight: data.fatherHeight,
+        motherHeight: data.motherHeight,
+        sex: data.sex,
         experiences: data.experiences || [],
         achievements: data.achievements || [],
         seeking: data.seeking || [],
