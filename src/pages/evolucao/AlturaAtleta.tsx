@@ -8,652 +8,588 @@ import {
   getUserProfile,
   updateAtletaProfile,
 } from "../../firebase/firestore";
+
 import { Trash2 } from "lucide-react";
 
 import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
   Tooltip,
   Legend,
-} from "recharts";
+} from "chart.js";
+import { Line } from "react-chartjs-2";
 
-type Tab = "previsao" | "cadastro" | "historico";
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Legend
+);
 
-type HeightRecord = {
+// Modelos de crescimento
+import {
+  GrowthPoint,
+  generateRealCurve,
+  predictMidParentalHeight,
+  predictLogisticMixed,
+  predictLogisticHistory,
+} from "../../utils/growthModels";
+
+type AlturaTab = "previsao" | "cadastroAltura" | "auxiliares" | "historico";
+
+interface HeightRecord {
   id: string;
   height: number;
-  date: string; // 'YYYY-MM-DD'
-  createdAt?: any;
-};
-
-type Sex = "M" | "F";
-
-interface ProfileExtras {
-  birthDate?: string;
-  fatherHeight?: number;
-  motherHeight?: number;
-  sex?: Sex;
+  date: string; // yyyy-mm-dd
 }
 
-function parseDate(dateStr?: string): Date | null {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return null;
-  return d;
+// ----------------- Helpers -----------------
+
+function calcularIdade(birthDate?: string, refDate?: string): number | null {
+  if (!birthDate) return null;
+  const birth = new Date(birthDate);
+  const ref = refDate ? new Date(refDate) : new Date();
+
+  let age = ref.getFullYear() - birth.getFullYear();
+  const m = ref.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && ref.getDate() < birth.getDate())) age--;
+
+  return age + m / 12;
 }
 
-function diffYears(from: Date, to: Date) {
-  return (to.getTime() - from.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
-}
+// Curva clínica (pais) – gera uma curva S suave usando o MPH como altura adulta
+function buildClinicalCurve(
+  adultHeight: number,
+  sex: "M" | "F"
+): { age: number; height: number }[] {
+  const L = adultHeight;
+  const m = sex === "M" ? 13 : 11.5; // idade aproximada do estirão
+  const k = sex === "M" ? 0.33 : 0.30; // taxa de crescimento
+  const maxAge = sex === "M" ? 19 : 17;
 
-// --------- modelos estatísticos simples ---------
-
-function fitLinear(points: { age: number; height: number }[]) {
-  const n = points.length;
-  if (n < 2) return null;
-
-  let sumX = 0,
-    sumY = 0,
-    sumXY = 0,
-    sumX2 = 0;
-  for (const p of points) {
-    sumX += p.age;
-    sumY += p.height;
-    sumXY += p.age * p.height;
-    sumX2 += p.age * p.age;
+  const curve: { age: number; height: number }[] = [];
+  for (let age = 0; age <= maxAge; age += 0.25) {
+    const h = L / (1 + Math.exp(-k * (age - m)));
+    curve.push({ age, height: h });
   }
-
-  const denom = n * sumX2 - sumX * sumX;
-  if (denom === 0) return null;
-
-  const b = (n * sumXY - sumX * sumY) / denom;
-  const a = (sumY - b * sumX) / n;
-
-  return { a, b }; // height = a + b * age
+  return curve;
 }
 
-// Resolve sistema 3x3 (para regressão quadrática)
-function solve3x3(A: number[][], B: number[]): number[] | null {
-  const a = A.map((row) => [...row]);
-  const b = [...B];
-
-  for (let i = 0; i < 3; i++) {
-    // pivô
-    let maxRow = i;
-    for (let r = i + 1; r < 3; r++) {
-      if (Math.abs(a[r][i]) > Math.abs(a[maxRow][i])) maxRow = r;
-    }
-    if (Math.abs(a[maxRow][i]) < 1e-8) return null;
-
-    // troca linhas
-    [a[i], a[maxRow]] = [a[maxRow], a[i]];
-    [b[i], b[maxRow]] = [b[maxRow], b[i]];
-
-    // normaliza
-    const pivot = a[i][i];
-    for (let c = i; c < 3; c++) a[i][c] /= pivot;
-    b[i] /= pivot;
-
-    // zera abaixo
-    for (let r = 0; r < 3; r++) {
-      if (r === i) continue;
-      const factor = a[r][i];
-      for (let c = i; c < 3; c++) {
-        a[r][c] -= factor * a[i][c];
-      }
-      b[r] -= factor * b[i];
-    }
-  }
-
-  return b; // já está solucionado
+// Converte {age, height} → {x, y} para o Chart.js com eixo X numérico
+function toXY(curve: { age: number; height: number }[]) {
+  return curve.map((p) => ({ x: p.age, y: p.height }));
 }
 
-function fitQuadratic(points: { age: number; height: number }[]) {
-  const n = points.length;
-  if (n < 3) return null;
-
-  let Sx = 0,
-    Sx2 = 0,
-    Sx3 = 0,
-    Sx4 = 0,
-    Sy = 0,
-    Sxy = 0,
-    Sx2y = 0;
-
-  for (const p of points) {
-    const x = p.age;
-    const y = p.height;
-    const x2 = x * x;
-
-    Sx += x;
-    Sx2 += x2;
-    Sx3 += x2 * x;
-    Sx4 += x2 * x2;
-    Sy += y;
-    Sxy += x * y;
-    Sx2y += x2 * y;
-  }
-
-  const A = [
-    [n, Sx, Sx2],
-    [Sx, Sx2, Sx3],
-    [Sx2, Sx3, Sx4],
-  ];
-  const B = [Sy, Sxy, Sx2y];
-
-  const sol = solve3x3(A, B);
-  if (!sol) return null;
-
-  const [a, b, c] = sol;
-  return { a, b, c }; // height = a + b*x + c*x²
-}
-
-function formatHeight(h?: number | null) {
-  if (h == null || Number.isNaN(h)) return "–";
-  return `${h.toFixed(1)} cm`;
-}
+// ============================================================
+// ====================== COMPONENTE ==========================
+// ============================================================
 
 export default function AlturaAtleta() {
-  const usuarioAtual = auth.currentUser?.uid;
+  const [activeTab, setActiveTab] = useState<AlturaTab>("previsao");
 
-  const [tab, setTab] = useState<Tab>("previsao");
-
-  const [height, setHeight] = useState("");
-  const [date, setDate] = useState("");
   const [history, setHistory] = useState<HeightRecord[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [profile, setProfile] = useState<any | null>(null);
 
-  const [profile, setProfile] = useState<ProfileExtras>({});
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  // Cadastro de altura
+  const [heightInput, setHeightInput] = useState("");
+  const [dateInput, setDateInput] = useState("");
 
-  const [savingHeight, setSavingHeight] = useState(false);
-  const [savingProfile, setSavingProfile] = useState(false);
+  // Dados auxiliares
+  const [fatherHeightInput, setFatherHeightInput] = useState("");
+  const [motherHeightInput, setMotherHeightInput] = useState("");
+  const [sexInput, setSexInput] = useState<"masculino" | "feminino">(
+    "masculino"
+  );
+
+  const [saving, setSaving] = useState(false);
+
+  // ----------------- Carregamento inicial -----------------
 
   useEffect(() => {
-    // se não tiver usuário logado, não faz nada
-    if (!usuarioAtual) return;
-  
-    async function loadAll(uid: string) {
+    async function loadAll() {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+
       setLoadingHistory(true);
-      setLoadingProfile(true);
-  
-      const [hist, prof] = await Promise.all([
-        getHeightHistory(uid),
-        getUserProfile(uid),
-      ]);
-  
-      setHistory(
-        hist.map((h: any) => ({
-          id: h.id,
+
+      try {
+        const [hist, prof] = await Promise.all([
+          getHeightHistory(uid),
+          getUserProfile(uid),
+        ]);
+
+        setHistory(hist);
+        setProfile(prof);
+
+        if (prof?.fatherHeight)
+          setFatherHeightInput(String(prof.fatherHeight));
+        if (prof?.motherHeight)
+          setMotherHeightInput(String(prof.motherHeight));
+        if (prof?.sex === "F") setSexInput("feminino");
+      } catch (e) {
+        console.error("Erro ao carregar dados:", e);
+      } finally {
+        setLoadingHistory(false);
+      }
+    }
+
+    loadAll();
+  }, []);
+
+  // ----------------- Histórico + idade -----------------
+
+  const historyWithAge = useMemo(
+    () =>
+      history.map((h) => ({
+        ...h,
+        ageAtMeasurement: profile?.birthDate
+          ? calcularIdade(profile.birthDate, h.date)
+          : null,
+      })),
+    [history, profile?.birthDate]
+  );
+
+  const sexCode: "M" | "F" = profile?.sex === "F" ? "F" : "M";
+
+  const growthPoints: GrowthPoint[] = useMemo(
+    () =>
+      historyWithAge
+        .filter((h) => h.ageAtMeasurement != null)
+        .map((h) => ({
+          age: h.ageAtMeasurement as number,
           height: h.height,
-          date: h.date,
-          createdAt: h.createdAt,
-        }))
-      );
-  
-      setProfile({
-        birthDate: prof?.birthDate,
-        fatherHeight: prof?.fatherHeight,
-        motherHeight: prof?.motherHeight,
-        sex: prof?.sex as Sex | undefined,
-      });
-  
-      setLoadingHistory(false);
-      setLoadingProfile(false);
-    }
-  
-    // aqui o TS sabe que é string, porque só chega se passou no if acima
-    loadAll(usuarioAtual);
-  }, [usuarioAtual]);
-  
-  // -------------- Derivados para modelos ----------------
+        })),
+    [historyWithAge]
+  );
 
-  const birthDateObj = useMemo(() => parseDate(profile.birthDate), [profile.birthDate]);
+  // ----------------- Modelos de previsão -----------------
 
-  const points = useMemo(() => {
-    if (!birthDateObj) return [] as { age: number; height: number }[];
-    return history
-      .map((h) => {
-        const d = parseDate(h.date);
-        if (!d) return null;
-        return { age: diffYears(birthDateObj, d), height: h.height };
-      })
-      .filter(Boolean) as { age: number; height: number }[];
-  }, [birthDateObj, history]);
+  // Modelo clínico (pais)
+  const mphAdult = useMemo(
+    () =>
+      predictMidParentalHeight({
+        sex: sexCode,
+        fatherHeight: profile?.fatherHeight,
+        motherHeight: profile?.motherHeight,
+      }),
+    [sexCode, profile?.fatherHeight, profile?.motherHeight]
+  );
 
-  const linearModel = useMemo(() => fitLinear(points), [points]);
-  const quadModel = useMemo(() => fitQuadratic(points), [points]);
+  // Curva clínica completa
+  const clinicalCurve = useMemo(() => {
+    if (!mphAdult) return null;
+    return buildClinicalCurve(mphAdult, sexCode);
+  }, [mphAdult, sexCode]);
 
-  const MPH = useMemo(() => {
-    if (!profile.fatherHeight || !profile.motherHeight || !profile.sex) return null;
+  // Trajetória Pais + Histórico (Logistic Mixed)
+  const mixedResult = useMemo(
+    () => predictLogisticMixed(growthPoints, mphAdult),
+    [growthPoints, mphAdult]
+  );
 
-    if (profile.sex === "M") {
-      return (profile.fatherHeight + profile.motherHeight + 13) / 2;
-    } else {
-      return (profile.fatherHeight + profile.motherHeight - 13) / 2;
-    }
-  }, [profile.fatherHeight, profile.motherHeight, profile.sex]);
+  // Trajetória baseada no Histórico (Logistic History)
+  const historyResult = useMemo(
+    () => predictLogisticHistory(growthPoints),
+    [growthPoints]
+  );
 
-  const targetAge = 18;
+  // Curva real (apenas os pontos reais conectados)
+  const realCurve = useMemo(
+    () => generateRealCurve(growthPoints),
+    [growthPoints]
+  );
 
-  const linearAt18 =
-    linearModel != null ? linearModel.a + linearModel.b * targetAge : null;
-
-  const quadAt18 =
-    quadModel != null
-      ? quadModel.a + quadModel.b * targetAge + quadModel.c * targetAge * targetAge
-      : null;
-
-  const ageNow = useMemo(() => {
-    if (!birthDateObj) return null;
-    return diffYears(birthDateObj, new Date());
-  }, [birthDateObj]);
+  // ----------------- Dados do gráfico -----------------
 
   const chartData = useMemo(() => {
-    if (!points.length) return [];
-
-    const firstAge = Math.max(0, Math.floor(points[0].age));
-    const lastAge = Math.max(
-      targetAge,
-      Math.ceil(points[points.length - 1].age)
-    );
-
-    const data: any[] = [];
-
-    for (let age = firstAge; age <= lastAge; age++) {
-      const row: any = { age };
-      if (linearModel) row.linear = linearModel.a + linearModel.b * age;
-      if (quadModel)
-        row.quadratic =
-          quadModel.a + quadModel.b * age + quadModel.c * age * age;
-      if (MPH != null) row.mph = MPH;
-      data.push(row);
+    if (
+      !realCurve.length &&
+      !clinicalCurve &&
+      !mixedResult &&
+      !historyResult
+    ) {
+      return null;
     }
 
-    // também podemos marcar pontos reais
-    points.forEach((p) => {
-      const idx = data.findIndex((d) => d.age === Math.round(p.age));
-      if (idx >= 0) data[idx].real = p.height;
-    });
+    const datasets: any[] = [];
 
-    return data;
-  }, [points, linearModel, quadModel, MPH]);
+    if (realCurve.length) {
+      datasets.push({
+        label: "Altura Real",
+        data: toXY(realCurve),
+        borderColor: "#ffffff",
+        borderWidth: 2,
+        pointRadius: 4,
+        pointBackgroundColor: "#ffffff",
+        tension: 0.1,
+      });
+    }
 
-  // -------------- Ações ----------------
+    if (clinicalCurve) {
+      datasets.push({
+        label: "Curva Clínica (Pais)",
+        data: toXY(clinicalCurve),
+        borderColor: "#f97316",
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.3,
+      });
+    }
+
+    if (mixedResult?.curve?.length) {
+      datasets.push({
+        label: "Trajetória Pais + Histórico",
+        data: toXY(mixedResult.curve),
+        borderColor: "#22c55e",
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.3,
+      });
+    }
+
+    if (historyResult?.curve?.length) {
+      datasets.push({
+        label: "Trajetória baseada no Histórico",
+        data: toXY(historyResult.curve),
+        borderColor: "#38bdf8",
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.3,
+      });
+    }
+
+    return { datasets };
+  }, [realCurve, clinicalCurve, mixedResult, historyResult]);
+
+  const chartOptions: any = useMemo(
+    () => ({
+      responsive: true,
+      plugins: {
+        legend: {
+          labels: { color: "#e5e7eb" },
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx: any) => {
+              const v = ctx.parsed.y;
+              if (v == null) return "";
+              return `${ctx.dataset.label}: ${v.toFixed(1)} cm`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          type: "linear",
+          title: {
+            display: true,
+            text: "Idade (anos)",
+            color: "#9ca3af",
+          },
+          ticks: { color: "#9ca3af" },
+          grid: { color: "rgba(107,114,128,0.3)" },
+        },
+        y: {
+          title: {
+            display: true,
+            text: "Altura (cm)",
+            color: "#9ca3af",
+          },
+          ticks: { color: "#9ca3af" },
+          grid: { color: "rgba(75,85,99,0.4)" },
+        },
+      },
+    }),
+    []
+  );
+
+  // ----------------- Ações: salvar / excluir -----------------
 
   async function handleSaveHeight() {
-    if (!usuarioAtual) {
-      alert("Você precisa estar logado.");
-      return;
-    }
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
 
-    if (!height || !date) {
-      alert("Preencha altura e data.");
+    if (!heightInput || !dateInput) {
+      alert("Informe altura e data.");
       return;
     }
 
     try {
-      setSavingHeight(true);
-      await addHeightRecord(usuarioAtual, Number(height), date);
-      const lista = await getHeightHistory(usuarioAtual);
-      setHistory(
-        lista.map((h: any) => ({
-          id: h.id,
-          height: h.height,
-          date: h.date,
-          createdAt: h.createdAt,
-        }))
-      );
-      setHeight("");
-      setDate("");
+      setSaving(true);
+      const height = Number(heightInput.replace(",", "."));
+
+      await addHeightRecord(uid, height, dateInput);
+      const hist = await getHeightHistory(uid);
+      setHistory(hist);
+
+      setHeightInput("");
+      setDateInput("");
+      alert("Altura registrada!");
     } catch (e) {
       console.error(e);
       alert("Erro ao salvar altura.");
     } finally {
-      setSavingHeight(false);
+      setSaving(false);
+    }
+  }
+
+  async function handleSaveAux() {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+
+    try {
+      setSaving(true);
+
+      await updateAtletaProfile(uid, {
+        fatherHeight: fatherHeightInput
+          ? Number(fatherHeightInput)
+          : undefined,
+        motherHeight: motherHeightInput
+          ? Number(motherHeightInput)
+          : undefined,
+        sex: sexInput === "feminino" ? "F" : "M",
+      });
+
+      const prof = await getUserProfile(uid);
+      setProfile(prof);
+
+      alert("Dados auxiliares atualizados!");
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao salvar dados auxiliares.");
+    } finally {
+      setSaving(false);
     }
   }
 
   async function handleDelete(recordId: string) {
-    if (!usuarioAtual) return;
-    if (!confirm("Deseja realmente excluir esta medida?")) return;
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    if (!confirm("Deseja excluir este registro de altura?")) return;
 
-    await deleteHeightRecord(usuarioAtual, recordId);
-    const lista = await getHeightHistory(usuarioAtual);
-    setHistory(
-      lista.map((h: any) => ({
-        id: h.id,
-        height: h.height,
-        date: h.date,
-        createdAt: h.createdAt,
-      }))
-    );
+    await deleteHeightRecord(uid, recordId);
+    const hist = await getHeightHistory(uid);
+    setHistory(hist);
   }
 
-  async function handleSaveProfileExtras() {
-    if (!usuarioAtual) return;
-
-    try {
-      setSavingProfile(true);
-      await updateAtletaProfile(usuarioAtual, {
-        fatherHeight: profile.fatherHeight || null,
-        motherHeight: profile.motherHeight || null,
-        sex: profile.sex || null,
-      } as any);
-      alert("Dados para previsão atualizados com sucesso!");
-    } catch (e) {
-      console.error(e);
-      alert("Erro ao salvar dados.");
-    } finally {
-      setSavingProfile(false);
-    }
-  }
-
-  // -------------- Render ----------------
-
-  if (!usuarioAtual) {
-    return <p className="text-white">Você precisa estar logado.</p>;
-  }
+  // ----------------- Render -----------------
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto w-full px-4">
-      {/* Cabeçalho */}
+    <div className="space-y-10 max-w-6xl mx-auto w-full px-4">
       <div className="space-y-2">
         <h1 className="text-3xl font-bold text-white">Altura e Crescimento</h1>
-        <p className="text-gray-400">
-          Registre suas medidas e acompanhe as previsões de altura adulta com
-          diferentes modelos.
+        <p className="text-gray-400 max-w-3xl">
+          Registre suas medidas e acompanhe a curva de crescimento até a altura
+          adulta estimada.
         </p>
       </div>
 
-      {/* Abas internas */}
-      <div className="flex gap-2 border-b border-gray-700/70 pb-2">
+      {/* Tabs */}
+      <div className="flex gap-3 border-b border-gray-800">
         {[
           { id: "previsao", label: "Previsão" },
-          { id: "cadastro", label: "Cadastro" },
+          { id: "auxiliares", label: "Dados Auxiliares" },
+          { id: "cadastroAltura", label: "Cadastro de Altura" },
           { id: "historico", label: "Histórico" },
-        ].map((t) => (
+        ].map((tab) => (
           <button
-            key={t.id}
-            onClick={() => setTab(t.id as Tab)}
-            className={`px-4 py-2 rounded-t-lg text-sm font-semibold transition ${
-              tab === t.id
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as AlturaTab)}
+            className={`px-5 py-2 rounded-t-lg text-sm font-semibold transition ${
+              activeTab === tab.id
                 ? "bg-orange-500 text-white"
-                : "text-gray-400 hover:text-white hover:bg-gray-800/60"
+                : "text-gray-400 hover:text-white"
             }`}
           >
-            {t.label}
+            {tab.label}
           </button>
         ))}
       </div>
 
-      {/* Conteúdo das abas */}
-      {tab === "previsao" && (
-        <div className="space-y-6">
+      {/* --------- TAB: PREVISÃO --------- */}
+      {activeTab === "previsao" && (
+        <div className="space-y-8">
           {/* Cards resumo */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-gray-900/80 border border-gray-700 rounded-2xl p-4">
-              <p className="text-xs text-gray-400 uppercase tracking-wide">
-                Modelo Clínico (Pais)
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Clínico (Pais) */}
+            <div className="bg-gray-900/70 border border-gray-700 rounded-2xl p-5">
+              <h3 className="text-sm font-semibold text-gray-300">
+                MODELO CLÍNICO (Pais)
+              </h3>
+              <p className="text-3xl font-bold text-orange-400 mt-3">
+                {mphAdult ? `${mphAdult.toFixed(1)} cm` : "—"}
               </p>
-              <p className="text-2xl font-bold text-orange-400 mt-2">
-                {formatHeight(MPH)}
-              </p>
-              <p className="text-xs text-gray-400 mt-1">
-                Mid–Parental Height usando altura dos pais.
-              </p>
-            </div>
-
-            <div className="bg-gray-900/80 border border-gray-700 rounded-2xl p-4">
-              <p className="text-xs text-gray-400 uppercase tracking-wide">
-                Regressão Linear
-              </p>
-              <p className="text-2xl font-bold text-orange-400 mt-2">
-                {formatHeight(linearAt18)}
-              </p>
-              <p className="text-xs text-gray-400 mt-1">
-                Estimativa aos 18 anos baseada na tendência linear das
-                medições.
+              <p className="text-xs text-gray-400 mt-3">
+                Curva de crescimento baseada apenas na altura dos pais.
               </p>
             </div>
 
-            <div className="bg-gray-900/80 border border-gray-700 rounded-2xl p-4">
-              <p className="text-xs text-gray-400 uppercase tracking-wide">
-                Regressão Quadrática
+            {/* Pais + Histórico */}
+            <div className="bg-gray-900/70 border border-gray-700 rounded-2xl p-5">
+              <h3 className="text-sm font-semibold text-gray-300">
+                TRAJETÓRIA Pais + Histórico
+              </h3>
+              <p className="text-3xl font-bold text-orange-400 mt-3">
+                {mixedResult
+                  ? `${mixedResult.predictedAdultHeight.toFixed(1)} cm`
+                  : "—"}
               </p>
-              <p className="text-2xl font-bold text-orange-400 mt-2">
-                {formatHeight(quadAt18)}
-              </p>
-              <p className="text-xs text-gray-400 mt-1">
-                Modelo de curva de crescimento (polinomial).
-              </p>
-            </div>
-          </div>
-
-          {/* Idade atual */}
-          <div className="flex justify-end text-sm text-gray-400">
-            Idade atual (aprox.):{" "}
-            <span className="font-semibold text-white ml-1">
-              {ageNow != null ? ageNow.toFixed(1).replace(".", ",") : "–"} anos
-            </span>
-          </div>
-
-          {/* Avisos */}
-          {(!birthDateObj || points.length < 2) && (
-            <div className="bg-yellow-900/40 border border-yellow-600/60 text-yellow-100 text-sm rounded-xl p-4">
-              <p className="font-semibold mb-1">Informações insuficientes</p>
-              {!birthDateObj && (
-                <p>
-                  • Cadastre sua <strong>data de nascimento</strong> no perfil
-                  para habilitar a previsão por idade.
+              {mixedResult && (
+                <p className="text-xs text-gray-400 mt-3">
+                  Considera altura dos pais e todo o histórico de medições.
                 </p>
               )}
-              {points.length < 2 && (
-                <p>
-                  • Registre pelo menos{" "}
-                  <strong>duas medições de altura</strong> para estimativas
-                  baseadas em regressão.
+            </div>
+
+            {/* Somente Histórico */}
+            <div className="bg-gray-900/70 border border-gray-700 rounded-2xl p-5">
+              <h3 className="text-sm font-semibold text-gray-300">
+                TRAJETÓRIA baseada no Histórico
+              </h3>
+              <p className="text-3xl font-bold text-orange-400 mt-3">
+                {historyResult
+                  ? `${historyResult.predictedAdultHeight.toFixed(1)} cm`
+                  : "—"}
+              </p>
+              {historyResult && (
+                <p className="text-xs text-gray-400 mt-3">
+                  Usa apenas a curva real de crescimento para projetar a altura
+                  adulta.
                 </p>
               )}
-              {profile.fatherHeight == null ||
-                profile.motherHeight == null ||
-                !profile.sex && (
-                  <p>
-                    • Informe <strong>altura do pai, da mãe e sexo</strong> na
-                    aba &quot;Cadastro&quot; para ativar o modelo clínico (MPH).
-                  </p>
-                )}
             </div>
-          )}
+          </div>
 
           {/* Gráfico */}
-          <div className="bg-gray-900/80 border border-gray-700 rounded-2xl p-4 h-80">
-            <h3 className="text-white font-semibold mb-3">
-              Curvas de previsão de altura
+          <div className="bg-gray-900/70 border border-gray-700 rounded-2xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-4">
+              Curvas de Previsão
             </h3>
-            {chartData.length === 0 ? (
-              <p className="text-gray-400 text-sm">
-                Registre medidas e dados de nascimento para visualizar o
-                gráfico.
-              </p>
+
+            {chartData ? (
+              <Line data={chartData as any} options={chartOptions} />
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#27272f" />
-                  <XAxis dataKey="age" tick={{ fill: "#9ca3af", fontSize: 12 }} />
-                  <YAxis
-                    tick={{ fill: "#9ca3af", fontSize: 12 }}
-                    domain={["dataMin - 5", "dataMax + 5"]}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#030712",
-                      border: "1px solid #374151",
-                      borderRadius: "0.75rem",
-                      fontSize: 12,
-                    }}
-                  />
-                  <Legend />
-                  {MPH != null && (
-                    <Line
-                      type="monotone"
-                      dataKey="mph"
-                      name="MPH (pais)"
-                      stroke="#f97316"
-                      dot={false}
-                      strokeWidth={2}
-                    />
-                  )}
-                  {linearModel && (
-                    <Line
-                      type="monotone"
-                      dataKey="linear"
-                      name="Linear"
-                      stroke="#22c55e"
-                      dot={false}
-                      strokeWidth={2}
-                    />
-                  )}
-                  {quadModel && (
-                    <Line
-                      type="monotone"
-                      dataKey="quadratic"
-                      name="Quadrática"
-                      stroke="#3b82f6"
-                      dot={false}
-                      strokeWidth={2}
-                    />
-                  )}
-                  <Line
-                    type="monotone"
-                    dataKey="real"
-                    name="Medições"
-                    stroke="#e5e7eb"
-                    dot={{ r: 4 }}
-                    strokeWidth={0}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <p className="text-gray-400 text-sm">
+                Cadastre pelo menos uma medida de altura e os dados dos pais
+                para visualizar as curvas.
+              </p>
             )}
           </div>
         </div>
       )}
 
-      {tab === "cadastro" && (
-        <div className="space-y-8">
-          {/* FORM ALTURA */}
-          <div className="bg-gray-900/70 border border-gray-700 rounded-2xl p-6 space-y-5">
+      {/* --------- TAB: CADASTRO ALTURA --------- */}
+      {activeTab === "cadastroAltura" && (
+        <div className="space-y-8 max-w-xl">
+          <div className="bg-gray-900/70 border border-gray-700 rounded-2xl p-6 space-y-6">
             <h2 className="text-lg font-semibold text-white">
-              Registrar nova altura
+              Registrar Nova Altura
             </h2>
 
             <input
               type="number"
-              value={height}
-              onChange={(e) => setHeight(e.target.value)}
+              value={heightInput}
+              onChange={(e) => setHeightInput(e.target.value)}
               placeholder="Altura (cm)"
-              className="w-full px-4 py-3 rounded-lg bg-gray-800 border border-gray-600 text-white text-lg"
+              className="w-full px-4 py-3 rounded-lg bg-gray-800 text-white border border-gray-700"
             />
 
             <input
               type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg bg-gray-800 border border-gray-600 text-white text-lg"
+              value={dateInput}
+              onChange={(e) => setDateInput(e.target.value)}
+              className="w-full px-4 py-3 rounded-lg bg-gray-800 text-white border border-gray-700"
             />
 
             <button
               onClick={handleSaveHeight}
-              disabled={savingHeight}
-              className="w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-600 font-semibold text-white text-lg transition disabled:opacity-60 disabled:cursor-not-allowed"
+              disabled={saving}
+              className="w-full py-3 rounded-xl bg-orange-500 font-semibold text-white hover:bg-orange-600 disabled:opacity-60"
             >
-              {savingHeight ? "Salvando..." : "Salvar altura"}
+              {saving ? "Salvando..." : "Salvar Altura"}
             </button>
-          </div>
-
-          {/* FORM DADOS AUXILIARES */}
-          <div className="bg-gray-900/70 border border-gray-700 rounded-2xl p-6 space-y-5">
-            <h2 className="text-lg font-semibold text-white">
-              Dados para previsão
-            </h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <label className="text-sm text-gray-300">Altura do pai (cm)</label>
-                <input
-                  type="number"
-                  value={profile.fatherHeight ?? ""}
-                  onChange={(e) =>
-                    setProfile((old) => ({
-                      ...old,
-                      fatherHeight: e.target.value
-                        ? Number(e.target.value)
-                        : undefined,
-                    }))
-                  }
-                  className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm text-gray-300">
-                  Altura da mãe (cm)
-                </label>
-                <input
-                  type="number"
-                  value={profile.motherHeight ?? ""}
-                  onChange={(e) =>
-                    setProfile((old) => ({
-                      ...old,
-                      motherHeight: e.target.value
-                        ? Number(e.target.value)
-                        : undefined,
-                    }))
-                  }
-                  className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm text-gray-300">Sexo do atleta</label>
-                <select
-                  value={profile.sex ?? ""}
-                  onChange={(e) =>
-                    setProfile((old) => ({
-                      ...old,
-                      sex: e.target.value ? (e.target.value as Sex) : undefined,
-                    }))
-                  }
-                  className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white"
-                >
-                  <option value="">Selecione</option>
-                  <option value="M">Masculino</option>
-                  <option value="F">Feminino</option>
-                </select>
-              </div>
-            </div>
-
-            <button
-              onClick={handleSaveProfileExtras}
-              disabled={savingProfile}
-              className="px-6 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 font-semibold text-white text-sm transition disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {savingProfile ? "Salvando..." : "Salvar dados de previsão"}
-            </button>
-
-            <p className="text-xs text-gray-400 mt-2">
-              Esses dados são usados apenas para estimar altura adulta pelo
-              modelo clínico (MPH). Você pode alterá-los a qualquer momento.
-            </p>
           </div>
         </div>
       )}
 
-      {tab === "historico" && (
+      {/* --------- TAB: DADOS AUXILIARES --------- */}
+      {activeTab === "auxiliares" && (
+        <div className="space-y-8 max-w-xl">
+          <div className="bg-gray-900/70 border border-gray-700 rounded-2xl p-6 space-y-6">
+            <h2 className="text-lg font-semibold text-white">
+              Dados Auxiliares para Previsão
+            </h2>
+
+            {/* Sexo */}
+            <div className="flex gap-4 text-sm">
+              <label className="flex items-center gap-2 text-gray-300">
+                <input
+                  type="radio"
+                  className="accent-orange-500"
+                  value="masculino"
+                  checked={sexInput === "masculino"}
+                  onChange={() => setSexInput("masculino")}
+                />
+                Masculino
+              </label>
+
+              <label className="flex items-center gap-2 text-gray-300">
+                <input
+                  type="radio"
+                  className="accent-orange-500"
+                  value="feminino"
+                  checked={sexInput === "feminino"}
+                  onChange={() => setSexInput("feminino")}
+                />
+                Feminino
+              </label>
+            </div>
+
+            {/* Altura dos pais */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <label className="block text-gray-300 mb-1">
+                  Altura do pai (cm)
+                </label>
+                <input
+                  type="number"
+                  value={fatherHeightInput}
+                  onChange={(e) => setFatherHeightInput(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-300 mb-1">
+                  Altura da mãe (cm)
+                </label>
+                <input
+                  type="number"
+                  value={motherHeightInput}
+                  onChange={(e) => setMotherHeightInput(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleSaveAux}
+              disabled={saving}
+              className="w-full py-3 rounded-xl bg-orange-500 text-white font-semibold hover:bg-orange-600 disabled:opacity-60"
+            >
+              {saving ? "Salvando..." : "Salvar Dados"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* --------- TAB: HISTÓRICO --------- */}
+      {activeTab === "historico" && (
         <div className="bg-gray-900/70 border border-gray-700 rounded-2xl p-6 space-y-5">
           <h2 className="text-lg font-semibold text-white">
             Histórico de Medidas
@@ -662,45 +598,40 @@ export default function AlturaAtleta() {
           {loadingHistory && <p className="text-gray-400">Carregando...</p>}
 
           {!loadingHistory && history.length === 0 && (
-            <p className="text-gray-400">Nenhuma altura registrada ainda.</p>
+            <p className="text-gray-400 text-sm">
+              Nenhuma altura registrada ainda.
+            </p>
           )}
 
           {!loadingHistory && history.length > 0 && (
             <div className="space-y-4">
-              {history.map((h) => {
-                const d = parseDate(h.date);
-                const age =
-                  birthDateObj && d ? diffYears(birthDateObj, d) : null;
-
-                return (
-                  <div
-                    key={h.id}
-                    className="flex items-center justify-between bg-gray-800/60 border border-gray-700 rounded-xl px-4 py-3"
-                  >
-                    <div>
-                      <p className="text-white font-bold text-lg">
-                        {h.height} cm
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        Data: {h.date}
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        Idade:{" "}
-                        {age != null ? age.toFixed(1).replace(".", ",") : "–"}{" "}
-                        anos
-                      </p>
-                    </div>
-
-                    <button
-                      onClick={() => handleDelete(h.id)}
-                      className="p-2 rounded-full hover:bg-red-500/10 text-red-400 hover:text-red-300 transition"
-                      title="Excluir medida"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+              {historyWithAge.map((h) => (
+                <div
+                  key={h.id}
+                  className="flex items-center justify-between bg-gray-800/60 border border-gray-700 rounded-xl px-4 py-3"
+                >
+                  <div>
+                    <p className="text-white font-bold text-lg">
+                      {h.height} cm
+                    </p>
+                    <p className="text-xs text-gray-400">Data: {h.date}</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Idade:{" "}
+                      {h.ageAtMeasurement != null
+                        ? `${h.ageAtMeasurement.toFixed(1).replace(".", ",")} anos`
+                        : "—"}
+                    </p>
                   </div>
-                );
-              })}
+
+                  <button
+                    onClick={() => handleDelete(h.id)}
+                    className="text-red-400 hover:text-red-300 p-2"
+                    title="Excluir medida"
+                  >
+                    <Trash2 size={20} />
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </div>

@@ -429,7 +429,13 @@ export async function addHeightRecord(
   });
 }
 
-export async function getHeightHistory(uid: string) {
+export interface HeightRecord {
+  id: string;
+  height: number;
+  date: string;
+}
+
+export async function getHeightHistory(uid: string): Promise<HeightRecord[]> {
   const q = query(
     collection(db, "users", uid, "heightRecords"),
     orderBy("date", "asc")
@@ -437,11 +443,19 @@ export async function getHeightHistory(uid: string) {
 
   const snap = await getDocs(q);
 
-  return snap.docs.map((d) => ({
-    id: d.id,
-    ...d.data()
-  }));
+  const list: HeightRecord[] = snap.docs.map((d) => {
+    const data = d.data();
+
+    return {
+      id: d.id,
+      height: Number(data.height ?? 0),
+      date: String(data.date ?? ""),
+    };
+  });
+
+  return list;
 }
+
 
 export async function deleteHeightRecord(uid: string, recordId: string) {
   const ref = doc(db, "users", uid, "heightRecords", recordId);
