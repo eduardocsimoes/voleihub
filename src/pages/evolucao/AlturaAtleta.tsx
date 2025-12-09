@@ -48,6 +48,11 @@ interface HeightRecord {
   date: string; // yyyy-mm-dd
 }
 
+interface ClinicalCurve {
+  curve: { age: number; height: number }[];
+  adultAge: number;
+}
+
 // ----------------- Helpers -----------------
 
 function calcularIdade(birthDate?: string, refDate?: string): number | null {
@@ -66,23 +71,32 @@ function calcularIdade(birthDate?: string, refDate?: string): number | null {
 function buildClinicalCurve(
   adultHeight: number,
   sex: "M" | "F"
-): { age: number; height: number }[] {
+): ClinicalCurve {
   const L = adultHeight;
   const m = sex === "M" ? 13 : 11.5; // idade aproximada do estirão
   const k = sex === "M" ? 0.33 : 0.30; // taxa de crescimento
   const maxAge = sex === "M" ? 19 : 17;
 
   const curve: { age: number; height: number }[] = [];
+  let lastAge = 0;
+
   for (let age = 0; age <= maxAge; age += 0.25) {
     const h = L / (1 + Math.exp(-k * (age - m)));
     curve.push({ age, height: h });
+    lastAge = age;
   }
-  return curve;
+
+  return { curve, adultAge: lastAge };
 }
 
 // Converte {age, height} → {x, y} para o Chart.js com eixo X numérico
 function toXY(curve: { age: number; height: number }[]) {
   return curve.map((p) => ({ x: p.age, y: p.height }));
+}
+
+function formatAge(age?: number | null): string {
+  if (age == null || Number.isNaN(age)) return "—";
+  return age.toFixed(1).replace(".", ",");
 }
 
 // ============================================================
@@ -181,8 +195,8 @@ export default function AlturaAtleta() {
     [sexCode, profile?.fatherHeight, profile?.motherHeight]
   );
 
-  // Curva clínica completa
-  const clinicalCurve = useMemo(() => {
+  // Curva clínica completa + idade adulta
+  const clinical = useMemo<ClinicalCurve | null>(() => {
     if (!mphAdult) return null;
     return buildClinicalCurve(mphAdult, sexCode);
   }, [mphAdult, sexCode]);
@@ -210,7 +224,7 @@ export default function AlturaAtleta() {
   const chartData = useMemo(() => {
     if (
       !realCurve.length &&
-      !clinicalCurve &&
+      !clinical &&
       !mixedResult &&
       !historyResult
     ) {
@@ -231,10 +245,10 @@ export default function AlturaAtleta() {
       });
     }
 
-    if (clinicalCurve) {
+    if (clinical?.curve) {
       datasets.push({
         label: "Curva Clínica (Pais)",
-        data: toXY(clinicalCurve),
+        data: toXY(clinical.curve),
         borderColor: "#f97316",
         borderWidth: 2,
         pointRadius: 0,
@@ -265,7 +279,7 @@ export default function AlturaAtleta() {
     }
 
     return { datasets };
-  }, [realCurve, clinicalCurve, mixedResult, historyResult]);
+  }, [realCurve, clinical, mixedResult, historyResult]);
 
   const chartOptions: any = useMemo(
     () => ({
@@ -428,6 +442,15 @@ export default function AlturaAtleta() {
               <p className="text-xs text-gray-400 mt-3">
                 Curva de crescimento baseada apenas na altura dos pais.
               </p>
+              {clinical && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Altura adulta prevista por volta de{" "}
+                  <span className="font-semibold">
+                    {formatAge(clinical.adultAge)} anos
+                  </span>
+                  .
+                </p>
+              )}
             </div>
 
             {/* Pais + Histórico */}
@@ -440,9 +463,16 @@ export default function AlturaAtleta() {
                   ? `${mixedResult.predictedAdultHeight.toFixed(1)} cm`
                   : "—"}
               </p>
+              <p className="text-xs text-gray-400 mt-3">
+                Considera altura dos pais e todo o histórico de medições.
+              </p>
               {mixedResult && (
-                <p className="text-xs text-gray-400 mt-3">
-                  Considera altura dos pais e todo o histórico de medições.
+                <p className="text-xs text-gray-400 mt-1">
+                  Altura adulta prevista por volta de{" "}
+                  <span className="font-semibold">
+                    {formatAge(mixedResult.adultAge)} anos
+                  </span>
+                  .
                 </p>
               )}
             </div>
@@ -457,10 +487,17 @@ export default function AlturaAtleta() {
                   ? `${historyResult.predictedAdultHeight.toFixed(1)} cm`
                   : "—"}
               </p>
+              <p className="text-xs text-gray-400 mt-3">
+                Usa apenas a curva real de crescimento para projetar a altura
+                adulta.
+              </p>
               {historyResult && (
-                <p className="text-xs text-gray-400 mt-3">
-                  Usa apenas a curva real de crescimento para projetar a altura
-                  adulta.
+                <p className="text-xs text-gray-400 mt-1">
+                  Altura adulta prevista por volta de{" "}
+                  <span className="font-semibold">
+                    {formatAge(historyResult.adultAge)} anos
+                  </span>
+                  .
                 </p>
               )}
             </div>
