@@ -38,6 +38,7 @@ import {
   predictMidParentalHeight,
   predictLogisticMixed,
   predictLogisticHistory,
+  predictBayesianTrajectory,
 } from "../../utils/growthModels";
 
 type AlturaTab = "previsao" | "cadastroAltura" | "auxiliares" | "historico";
@@ -75,7 +76,7 @@ function buildClinicalCurve(
   const L = adultHeight;
   const m = sex === "M" ? 13 : 11.5; // idade aproximada do estirão
   const k = sex === "M" ? 0.33 : 0.30; // taxa de crescimento
-  const maxAge = sex === "M" ? 19 : 17;
+  const maxAge = sex === "M" ? 19 : 17; // estabiliza em idade realista
 
   const curve: { age: number; height: number }[] = [];
   let lastAge = 0;
@@ -97,6 +98,34 @@ function toXY(curve: { age: number; height: number }[]) {
 function formatAge(age?: number | null): string {
   if (age == null || Number.isNaN(age)) return "—";
   return age.toFixed(1).replace(".", ",");
+}
+
+function formatCI(lower?: number | null, upper?: number | null): string {
+  if (
+    lower == null ||
+    upper == null ||
+    Number.isNaN(lower) ||
+    Number.isNaN(upper)
+  ) {
+    return "—";
+  }
+  return `${lower.toFixed(1)} – ${upper.toFixed(1)} cm`;
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const clean = hex.replace("#", "");
+  const full =
+    clean.length === 3
+      ? clean
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : clean;
+  const num = parseInt(full, 16);
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 // ============================================================
@@ -171,6 +200,7 @@ export default function AlturaAtleta() {
 
   const sexCode: "M" | "F" = profile?.sex === "F" ? "F" : "M";
 
+  // Curva real só para comparação visual
   const growthPoints: GrowthPoint[] = useMemo(
     () =>
       historyWithAge
@@ -201,19 +231,36 @@ export default function AlturaAtleta() {
     return buildClinicalCurve(mphAdult, sexCode);
   }, [mphAdult, sexCode]);
 
-  // Trajetória Pais + Histórico (Logistic Mixed)
+  // Intervalo de confiança clínico: ±2.5% em torno da altura prevista
+  const clinicalCi = useMemo(() => {
+    if (!mphAdult) return null;
+    const pct = 0.025;
+    const delta = mphAdult * pct;
+    return {
+      lower: mphAdult - delta,
+      upper: mphAdult + delta,
+    };
+  }, [mphAdult]);
+
+  // Modelo Populacional (Pais + Referência)
   const mixedResult = useMemo(
-    () => predictLogisticMixed(growthPoints, mphAdult),
-    [growthPoints, mphAdult]
+    () => predictLogisticMixed(growthPoints, mphAdult, sexCode),
+    [growthPoints, mphAdult, sexCode]
   );
 
-  // Trajetória baseada no Histórico (Logistic History)
-  const historyResult = useMemo(
-    () => predictLogisticHistory(growthPoints),
-    [growthPoints]
+  // Curva de Referência (Percentil Próximo)
+  const referenceResult = useMemo(
+    () => predictLogisticHistory(growthPoints, mphAdult, sexCode),
+    [growthPoints, mphAdult, sexCode]
   );
 
-  // Curva real (apenas os pontos reais conectados)
+  // Modelo Bayesiano (Pais + População)
+  const bayesResult = useMemo(
+    () => predictBayesianTrajectory(growthPoints, mphAdult, sexCode),
+    [growthPoints, mphAdult, sexCode]
+  );
+
+  // Curva real (apenas comparação)
   const realCurve = useMemo(
     () => generateRealCurve(growthPoints),
     [growthPoints]
@@ -226,16 +273,18 @@ export default function AlturaAtleta() {
       !realCurve.length &&
       !clinical &&
       !mixedResult &&
-      !historyResult
+      !referenceResult &&
+      !bayesResult
     ) {
       return null;
     }
 
     const datasets: any[] = [];
 
+    // Altura real
     if (realCurve.length) {
       datasets.push({
-        label: "Altura Real",
+        label: "Altura Real (Histórico)",
         data: toXY(realCurve),
         borderColor: "#ffffff",
         borderWidth: 2,
@@ -245,6 +294,7 @@ export default function AlturaAtleta() {
       });
     }
 
+    // Curva clínica (pais) – sem banda no gráfico
     if (clinical?.curve) {
       datasets.push({
         label: "Curva Clínica (Pais)",
@@ -256,37 +306,83 @@ export default function AlturaAtleta() {
       });
     }
 
-    if (mixedResult?.curve?.length) {
-      datasets.push({
-        label: "Trajetória Pais + Histórico",
-        data: toXY(mixedResult.curve),
-        borderColor: "#22c55e",
-        borderWidth: 2,
-        pointRadius: 0,
-        tension: 0.3,
-      });
-    }
+    // Helper para adicionar curva + banda de confiança
+    const addLogisticWithBand = (
+      baseLabel: string,
+      color: string,
+      result: any
+    ) => {
+      if (!result) return;
 
-    if (historyResult?.curve?.length) {
+      const bandColor = hexToRgba(color, 0.15);
+
+      const upperXY = toXY(result.upperCurve || []);
+      const lowerXY = toXY(result.lowerCurve || []);
+
+      if (upperXY.length && lowerXY.length) {
+        datasets.push({
+          label: `${baseLabel} (limite superior IC)`,
+          data: upperXY,
+          borderWidth: 0,
+          pointRadius: 0,
+          fill: false,
+        });
+
+        datasets.push({
+          label: `${baseLabel} (IC)`,
+          data: lowerXY,
+          borderWidth: 0,
+          pointRadius: 0,
+          backgroundColor: bandColor,
+          fill: "-1",
+        });
+      }
+
       datasets.push({
-        label: "Trajetória baseada no Histórico",
-        data: toXY(historyResult.curve),
-        borderColor: "#38bdf8",
+        label: baseLabel,
+        data: toXY(result.curve || []),
+        borderColor: color,
         borderWidth: 2,
         pointRadius: 0,
         tension: 0.3,
       });
-    }
+    };
+
+    // Populacional
+    addLogisticWithBand(
+      "Modelo Populacional (Pais + Referência)",
+      "#22c55e",
+      mixedResult
+    );
+
+    // Curva de referência
+    addLogisticWithBand(
+      "Curva de Crescimento de Referência",
+      "#38bdf8",
+      referenceResult
+    );
+
+    // Bayesiano
+    addLogisticWithBand(
+      "Modelo Bayesiano (Pais + População)",
+      "#a855f7",
+      bayesResult
+    );
 
     return { datasets };
-  }, [realCurve, clinical, mixedResult, historyResult]);
+  }, [realCurve, clinical, mixedResult, referenceResult, bayesResult]);
 
   const chartOptions: any = useMemo(
     () => ({
       responsive: true,
       plugins: {
         legend: {
-          labels: { color: "#e5e7eb" },
+          labels: {
+            color: "#e5e7eb",
+            filter: (item: any) =>
+              !String(item.text || "").includes("(IC)") &&
+              !String(item.text || "").includes("limite superior IC"),
+          },
         },
         tooltip: {
           callbacks: {
@@ -399,8 +495,8 @@ export default function AlturaAtleta() {
       <div className="space-y-2">
         <h1 className="text-3xl font-bold text-white">Altura e Crescimento</h1>
         <p className="text-gray-400 max-w-3xl">
-          Registre suas medidas e acompanhe a curva de crescimento até a altura
-          adulta estimada.
+          Registre suas medidas e compare a sua curva real com diferentes
+          metodologias de previsão de altura adulta.
         </p>
       </div>
 
@@ -430,33 +526,42 @@ export default function AlturaAtleta() {
       {activeTab === "previsao" && (
         <div className="space-y-8">
           {/* Cards resumo */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
             {/* Clínico (Pais) */}
             <div className="bg-gray-900/70 border border-gray-700 rounded-2xl p-5">
               <h3 className="text-sm font-semibold text-gray-300">
-                MODELO CLÍNICO (Pais)
+                MODELO CLÍNICO (Altura dos Pais)
               </h3>
               <p className="text-3xl font-bold text-orange-400 mt-3">
                 {mphAdult ? `${mphAdult.toFixed(1)} cm` : "—"}
               </p>
               <p className="text-xs text-gray-400 mt-3">
-                Curva de crescimento baseada apenas na altura dos pais.
+                Previsão clássica usada em pediatria, baseada apenas na altura
+                do pai e da mãe.
               </p>
               {clinical && (
                 <p className="text-xs text-gray-400 mt-1">
-                  Altura adulta prevista por volta de{" "}
+                  Altura máxima prevista por volta de{" "}
                   <span className="font-semibold">
                     {formatAge(clinical.adultAge)} anos
                   </span>
                   .
                 </p>
               )}
+              {clinicalCi && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Intervalo esperado:{" "}
+                  <span className="font-semibold">
+                    {formatCI(clinicalCi.lower, clinicalCi.upper)}
+                  </span>
+                </p>
+              )}
             </div>
 
-            {/* Pais + Histórico */}
+            {/* Populacional */}
             <div className="bg-gray-900/70 border border-gray-700 rounded-2xl p-5">
               <h3 className="text-sm font-semibold text-gray-300">
-                TRAJETÓRIA Pais + Histórico
+                MODELO POPULACIONAL (Pais + Referência)
               </h3>
               <p className="text-3xl font-bold text-orange-400 mt-3">
                 {mixedResult
@@ -464,41 +569,100 @@ export default function AlturaAtleta() {
                   : "—"}
               </p>
               <p className="text-xs text-gray-400 mt-3">
-                Considera altura dos pais e todo o histórico de medições.
+                Combina a altura dos pais com curvas de crescimento
+                populacionais (OMS/CDC) para ajustar a previsão.
               </p>
               {mixedResult && (
-                <p className="text-xs text-gray-400 mt-1">
-                  Altura adulta prevista por volta de{" "}
-                  <span className="font-semibold">
-                    {formatAge(mixedResult.adultAge)} anos
-                  </span>
-                  .
-                </p>
+                <>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Altura máxima prevista por volta de{" "}
+                    <span className="font-semibold">
+                      {formatAge(mixedResult.adultAge)} anos
+                    </span>
+                    .
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Intervalo de confiança:{" "}
+                    <span className="font-semibold">
+                      {formatCI(
+                        mixedResult.ciLowerAdult,
+                        mixedResult.ciUpperAdult
+                      )}
+                    </span>
+                  </p>
+                </>
               )}
             </div>
 
-            {/* Somente Histórico */}
+            {/* Curva de Referência */}
             <div className="bg-gray-900/70 border border-gray-700 rounded-2xl p-5">
               <h3 className="text-sm font-semibold text-gray-300">
-                TRAJETÓRIA baseada no Histórico
+                CURVA DE CRESCIMENTO DE REFERÊNCIA
               </h3>
               <p className="text-3xl font-bold text-orange-400 mt-3">
-                {historyResult
-                  ? `${historyResult.predictedAdultHeight.toFixed(1)} cm`
+                {referenceResult
+                  ? `${referenceResult.predictedAdultHeight.toFixed(1)} cm`
                   : "—"}
               </p>
               <p className="text-xs text-gray-400 mt-3">
-                Usa apenas a curva real de crescimento para projetar a altura
-                adulta.
+                Simula uma curva padrão (percentil próximo) usando o MPH como
+                base, sem usar o histórico individual.
               </p>
-              {historyResult && (
-                <p className="text-xs text-gray-400 mt-1">
-                  Altura adulta prevista por volta de{" "}
-                  <span className="font-semibold">
-                    {formatAge(historyResult.adultAge)} anos
-                  </span>
-                  .
-                </p>
+              {referenceResult && (
+                <>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Altura máxima prevista por volta de{" "}
+                    <span className="font-semibold">
+                      {formatAge(referenceResult.adultAge)} anos
+                    </span>
+                    .
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Intervalo de confiança:{" "}
+                    <span className="font-semibold">
+                      {formatCI(
+                        referenceResult.ciLowerAdult,
+                        referenceResult.ciUpperAdult
+                      )}
+                    </span>
+                  </p>
+                </>
+              )}
+            </div>
+
+            {/* Bayesiano */}
+            <div className="bg-gray-900/70 border border-gray-700 rounded-2xl p-5">
+              <h3 className="text-sm font-semibold text-gray-300">
+                MODELO BAYESIANO (Pais + População)
+              </h3>
+              <p className="text-3xl font-bold text-orange-400 mt-3">
+                {bayesResult
+                  ? `${bayesResult.predictedAdultHeight.toFixed(1)} cm`
+                  : "—"}
+              </p>
+              <p className="text-xs text-gray-400 mt-3">
+                Combina estatisticamente a média da população com a altura dos
+                pais, gerando uma previsão intermediária.
+              </p>
+              {bayesResult && (
+                <>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Altura máxima prevista por volta de{" "}
+                    <span className="font-semibold">
+                      {formatAge(bayesResult.adultAge)} anos
+                    </span>
+                    .
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Intervalo de confiança:{" "}
+                    <span className="font-semibold">
+                      {formatCI(
+                        bayesResult.ciLowerAdult,
+                        bayesResult.ciUpperAdult
+                      )}
+                    </span>
+                  </p>
+                </>
               )}
             </div>
           </div>
@@ -506,7 +670,7 @@ export default function AlturaAtleta() {
           {/* Gráfico */}
           <div className="bg-gray-900/70 border border-gray-700 rounded-2xl p-6">
             <h3 className="text-lg font-semibold text-white mb-4">
-              Curvas de Previsão
+              Curvas de Previsão x Altura Real
             </h3>
 
             {chartData ? (
@@ -655,7 +819,9 @@ export default function AlturaAtleta() {
                     <p className="text-xs text-gray-400 mt-1">
                       Idade:{" "}
                       {h.ageAtMeasurement != null
-                        ? `${h.ageAtMeasurement.toFixed(1).replace(".", ",")} anos`
+                        ? `${h.ageAtMeasurement
+                            .toFixed(1)
+                            .replace(".", ",")} anos`
                         : "—"}
                     </p>
                   </div>
