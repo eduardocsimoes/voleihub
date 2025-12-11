@@ -1,4 +1,3 @@
-// src/utils/growthModels.ts
 // =========================================================
 // =======  Modelos de Crescimento + Intervalo de CI  ======
 // =========================================================
@@ -16,13 +15,25 @@ export interface ConfidenceBand {
 }
 
 /**
- * Resultado de uma trajetória logística (curva do 0 até idade adulta)
+ * Resultado de uma trajetória (curva do 0 até idade adulta)
  * com banda de confiança percentual.
  */
 export interface LogisticResult extends ConfidenceBand {
   predictedAdultHeight: number;
   curve: { age: number; height: number }[];
   adultAge: number;
+}
+
+/**
+ * Dados auxiliares para refinar as previsões.
+ * (na prática vamos usar principalmente a última medida real)
+ */
+export interface AuxGrowthData {
+  sex: "M" | "F";
+  currentAge?: number;    // idade atual em anos (decimal)
+  currentHeight?: number; // altura atual em cm
+  currentWeight?: number; // opcional – por enquanto não usamos
+  menarcaAge?: number;    // se for menina
 }
 
 // =========================================================
@@ -65,15 +76,15 @@ function logisticHeight(age: number, L: number, k: number, m: number): number {
 function getSexParams(sex: "M" | "F") {
   if (sex === "F") {
     return {
-      m: 11.5,   // pico de crescimento ~11–12
-      k: 0.30,   // taxa
-      maxAgeAdult: 17, // estabiliza altura até ~17
+      m: 11.5,     // pico de crescimento ~11–12 anos
+      k: 0.32,     // taxa de crescimento
+      maxAgeAdult: 17, // estabiliza altura até ~17 anos
     };
   }
   return {
-    m: 13,      // pico ~13
-    k: 0.27,
-    maxAgeAdult: 19, // estabiliza até ~19
+    m: 13,        // pico ~13 anos
+    k: 0.30,
+    maxAgeAdult: 19, // estabiliza até ~19 anos
   };
 }
 
@@ -94,7 +105,7 @@ function generateLogisticCurve(
     const h = logisticHeight(age, L, k, m);
     curve.push({ age, height: h });
 
-    // se já está a menos de 0.1 cm do platô, paramos
+    // se já está a menos de 0.1 cm do platô, podemos parar
     if (h >= L - 0.1) break;
   }
 
@@ -105,153 +116,234 @@ function generateLogisticCurve(
 // ====== Banda de Confiança Percentual (± %) ==============
 // =========================================================
 
-function applyConfidenceBandPercent(
-  curve: { age: number; height: number }[],
+function buildBandFromAdultHeight(
+  adultHeight: number,
+  sex: "M" | "F",
   percent: number
 ): ConfidenceBand {
-  const lowerCurve = curve.map((p) => ({
-    age: p.age,
-    height: p.height * (1 - percent),
-  }));
-
-  const upperCurve = curve.map((p) => ({
-    age: p.age,
-    height: p.height * (1 + percent),
-  }));
-
-  const last = curve[curve.length - 1];
-  const ciLowerAdult = last.height * (1 - percent);
-  const ciUpperAdult = last.height * (1 + percent);
-
-  return { lowerCurve, upperCurve, ciLowerAdult, ciUpperAdult };
-}
-
-// =========================================================
-// === 2) Modelo Populacional (Pais + Referência) ==========
-// =========================================================
-//
-// - Usa MPH como base da altura adulta.
-// - Ajusta levemente em direção à média populacional OMS/CDC
-//   (valores aproximados para adultos).
-// - NÃO usa histórico individual.
-// =========================================================
-
-export function predictLogisticMixed(
-  history: GrowthPoint[],         // mantido apenas por compatibilidade (IGNORADO)
-  mph: number | null,
-  sex: "M" | "F"
-): LogisticResult | null {
-  if (mph == null) return null;
-
   const { m, k, maxAgeAdult } = getSexParams(sex);
+  const lowerL = adultHeight * (1 - percent);
+  const upperL = adultHeight * (1 + percent);
 
-  // médias populacionais aproximadas (OMS/CDC, adulto)
-  const popMean = sex === "F" ? 162 : 176;
-
-  // traz a altura alvo um pouco em direção à média populacional,
-  // mas mantendo MUITO próxima do MPH.
-  const L = 0.7 * mph + 0.3 * popMean;
-
-  const curve = generateLogisticCurve(L, k, m, maxAgeAdult);
-  const last = curve[curve.length - 1];
-
-  // IC de ±2.5% em torno da curva
-  const band = applyConfidenceBandPercent(curve, 0.025);
+  const lowerCurve = generateLogisticCurve(lowerL, k, m, maxAgeAdult);
+  const upperCurve = generateLogisticCurve(upperL, k, m, maxAgeAdult);
 
   return {
-    predictedAdultHeight: last.height,
-    adultAge: last.age,
+    lowerCurve,
+    upperCurve,
+    ciLowerAdult: lowerL,
+    ciUpperAdult: upperL,
+  };
+}
+
+/**
+ * Helper geral: a partir de uma altura adulta alvo,
+ * monta a trajetória logística + intervalo de confiança.
+ * CI fixo de ±1,5%.
+ */
+function buildResultFromAdultHeight(
+  adultHeight: number,
+  sex: "M" | "F"
+): LogisticResult {
+  const { m, k, maxAgeAdult } = getSexParams(sex);
+  const curve = generateLogisticCurve(adultHeight, k, m, maxAgeAdult);
+  const adultAge =
+    curve.length > 0 ? curve[curve.length - 1].age : maxAgeAdult;
+
+  const band = buildBandFromAdultHeight(adultHeight, sex, 0.015); // 1,5%
+
+  return {
+    predictedAdultHeight: adultHeight,
     curve,
+    adultAge,
     ...band,
   };
 }
 
 // =========================================================
-// === 3) Curva de Referência de Crescimento ===============
+// =====  Funções auxiliares para “altura atual”  ==========
+// =========================================================
+
+/**
+ * Fração aproximada da altura adulta para meninas, por idade.
+ * Valores grosseiros, inspirados em curvas OMS/CDC.
+ */
+function approximateFemaleFraction(age: number): number {
+  if (age <= 8) return 0.80;
+  if (age <= 10) return 0.88 + 0.01 * (age - 8);   // 8→0.88, 10→0.90
+  if (age <= 12) return 0.90 + 0.025 * (age - 10); // 10→0.90, 12→0.95
+  if (age <= 14) return 0.95 + 0.015 * (age - 12); // 12→0.95, 14→0.98
+  if (age <= 17) return 0.98 + 0.007 * (age - 14); // 14→0.98, 17→0.999
+  return 1.0;
+}
+
+/**
+ * Fração aproximada da altura adulta para meninos, por idade.
+ */
+function approximateMaleFraction(age: number): number {
+  if (age <= 10) return 0.78;
+  if (age <= 12) return 0.85 + 0.02 * (age - 10);  // 10→0.85, 12→0.89
+  if (age <= 14) return 0.89 + 0.02 * (age - 12);  // 12→0.89, 14→0.93
+  if (age <= 18) return 0.93 + 0.018 * (age - 14); // 14→0.93, 18→1.00
+  return 1.0;
+}
+
+/**
+ * Estima altura adulta a partir da altura atual.
+ * - Para meninas com idade da menarca: usa "crescimento remanescente" típico.
+ * - Caso contrário, usa fração aproximada da altura adulta por idade.
+ */
+function estimateAdultFromCurrent(
+  aux: AuxGrowthData,
+  mph: number | null
+): number | null {
+  const { sex, currentAge, currentHeight, menarcaAge } = aux;
+  if (!currentHeight || !currentAge) {
+    return mph;
+  }
+
+  // Meninas com menarca informada: usa regras de crescimento pós-menarca.
+  if (sex === "F" && menarcaAge != null) {
+    const yearsSinceMenarca = currentAge - menarcaAge;
+    let remaining: number;
+
+    if (yearsSinceMenarca <= 0) {
+      remaining = 8;
+    } else if (yearsSinceMenarca <= 1) {
+      // 6 → 4 cm conforme se aproxima de 1 ano pós-menarca
+      remaining = 6 - 2 * yearsSinceMenarca;
+    } else if (yearsSinceMenarca <= 2) {
+      // 4 → 2 cm entre 1 e 2 anos pós-menarca
+      remaining = 4 - 2 * (yearsSinceMenarca - 1);
+    } else if (yearsSinceMenarca <= 3) {
+      // 2 → 1 cm entre 2 e 3 anos
+      remaining = 2 - 1 * (yearsSinceMenarca - 2);
+    } else {
+      remaining = 1;
+    }
+
+    if (remaining < 0) remaining = 0;
+    return currentHeight + remaining;
+  }
+
+  // Caso geral: aproxima pela fração da altura adulta.
+  const frac =
+    sex === "F"
+      ? approximateFemaleFraction(currentAge)
+      : approximateMaleFraction(currentAge);
+
+  if (frac <= 0) return mph;
+  return currentHeight / frac;
+}
+
+// =========================================================
+// === 2) TRAJETÓRIA Clínica (Pais) =========================
 // =========================================================
 //
-// - Usa MPH como base, mas aplica um ajuste leve
-//   para simular um percentil um pouco acima/abaixo.
-// - NÃO usa histórico individual (apenas sexo + MPH).
+// Usa apenas o MPH como altura alvo. Curva logística padrão
+// e intervalo de confiança de ±1,5%.
+// =========================================================
+
+export function buildClinicalTrajectory(
+  mphAdult: number | null,
+  sex: "M" | "F"
+): LogisticResult | null {
+  if (mphAdult == null) return null;
+  return buildResultFromAdultHeight(mphAdult, sex);
+}
+
+// =========================================================
+// === 3) Modelo Populacional (Pais + Referência) ==========
+// =========================================================
+//
+// - Usa MPH como base da altura adulta.
+// - Usa uma estimativa de altura adulta baseada em dados
+//   populacionais aproximados (fração da altura por idade).
+// - NÃO utiliza toda a curva histórica, apenas altura atual
+//   (última medida) se disponível.
+// =========================================================
+
+export function predictLogisticMixed(
+  history: GrowthPoint[],         // mantido por compatibilidade (IGNORADO)
+  mph: number | null,
+  sex: "M" | "F",
+  aux?: AuxGrowthData
+): LogisticResult | null {
+  if (mph == null) return null;
+
+  const popMean = sex === "F" ? 162 : 176;
+
+  const adultFromCurrent =
+    aux != null ? estimateAdultFromCurrent(aux, mph) : mph;
+
+  // Combina MPH, população e altura atual – levemente otimista
+  const base =
+    adultFromCurrent != null ? adultFromCurrent : mph;
+
+  // mistura: 40% MPH, 40% baseAtual, 20% média populacional
+  const adultHeight =
+    0.4 * mph + 0.4 * base + 0.2 * popMean;
+
+  return buildResultFromAdultHeight(adultHeight, sex);
+}
+
+// =========================================================
+// === 4) Curva de Crescimento de Referência ===============
+// =========================================================
+//
+// - Usa MPH como base.
+// - Ajusta um pouco na direção da altura estimada pela
+//   altura atual, simulando um percentil próximo.
 // =========================================================
 
 export function predictLogisticHistory( // nome mantido só p/ compatibilidade
   history: GrowthPoint[],              // IGNORADO
   mph: number | null,
-  sex: "M" | "F"
+  sex: "M" | "F",
+  aux?: AuxGrowthData
 ): LogisticResult | null {
   if (mph == null) return null;
 
-  const { m, k, maxAgeAdult } = getSexParams(sex);
+  const adultFromCurrent =
+    aux != null ? estimateAdultFromCurrent(aux, mph) : mph;
 
-  // Curva "de referência" levemente diferente do MPH
-  // (ex.: um percentil ~75 se MPH já está perto da média).
-  const L = mph * 1.02; // 2% acima do MPH, bem próximo
+  const base =
+    adultFromCurrent != null ? adultFromCurrent : mph;
 
-  const curve = generateLogisticCurve(L, k, m, maxAgeAdult);
-  const last = curve[curve.length - 1];
+  // mais "colado" ao MPH, puxando 40% para a altura atual
+  const adultHeight = 0.6 * mph + 0.4 * base;
 
-  // IC de ±3% em torno da curva
-  const band = applyConfidenceBandPercent(curve, 0.03);
-
-  return {
-    predictedAdultHeight: last.height,
-    adultAge: last.age,
-    curve,
-    ...band,
-  };
+  return buildResultFromAdultHeight(adultHeight, sex);
 }
 
 // =========================================================
-// === 4) Modelo Bayesiano (Pais + População) ==============
+// === 5) Modelo Bayesiano (Pais + População) ==============
 // =========================================================
 //
-// - Prior: altura adulta da população (OMS/CDC).
-// - "Observação": MPH (altura dos pais).
-// - Posterior: combinação das duas fontes (sem histórico).
+// - Prior implícito no MPH (altura dos pais).
+// - "Evidência" forte na estimativa baseada na altura atual.
+// - Não usa toda a série histórica, apenas o ponto atual.
 // =========================================================
 
 export function predictBayesianTrajectory(
   history: GrowthPoint[],         // IGNORADO
   mph: number | null,
-  sex: "M" | "F"
+  sex: "M" | "F",
+  aux?: AuxGrowthData
 ): LogisticResult | null {
   if (mph == null) return null;
 
-  // Prior (população)
-  const popMean = sex === "F" ? 162 : 176;
-  const priorMean = popMean;
-  const priorSd = 6;
-  const priorVar = priorSd * priorSd;
+  const adultFromCurrent =
+    aux != null ? estimateAdultFromCurrent(aux, mph) : mph;
 
-  // "Observação" = MPH
-  const obsMean = mph;
-  const obsSd = 4;
-  const obsVar = obsSd * obsSd;
+  if (adultFromCurrent == null) {
+    return buildResultFromAdultHeight(mph, sex);
+  }
 
-  // Combinação bayesiana simples (normal-normal)
-  const posteriorMean =
-    (priorMean / priorVar + obsMean / obsVar) / (1 / priorVar + 1 / obsVar);
-  const posteriorVar = 1 / (1 / priorVar + 1 / obsVar);
-  const posteriorSd = Math.sqrt(posteriorVar);
+  // combinação bayesiana simples: 25% MPH, 75% "altura atual"
+  const adultHeight = (mph + 3 * adultFromCurrent) / 4;
 
-  const { m, k, maxAgeAdult } = getSexParams(sex);
-
-  const L = posteriorMean;
-  const curve = generateLogisticCurve(L, k, m, maxAgeAdult);
-  const last = curve[curve.length - 1];
-
-  // IC baseado no desvio posterior, com mínimo de ±2.5%
-  const pctFromSd = posteriorSd / last.height;
-  const percent = Math.max(0.025, pctFromSd);
-  const band = applyConfidenceBandPercent(curve, percent);
-
-  return {
-    predictedAdultHeight: last.height,
-    adultAge: last.age,
-    curve,
-    ...band,
-  };
+  return buildResultFromAdultHeight(adultHeight, sex);
 }
 
 // =========================================================
