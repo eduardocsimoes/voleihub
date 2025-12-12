@@ -39,7 +39,12 @@ export default function PhysicalEvolutionMenu({ onNavigate }: PhysicalEvolutionM
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Evolução Física</h1>
+      {/* TÍTULO EM BRANCO */}
+      <h1 className="text-3xl font-bold text-white">
+        Evolução Física
+      </h1>
+
+      {/* SUBTÍTULO LEGÍVEL */}
       <p className="text-gray-300">
         Acompanhe sua progressão física com registros e análises.
       </p>
@@ -59,7 +64,11 @@ export default function PhysicalEvolutionMenu({ onNavigate }: PhysicalEvolutionM
               </div>
 
               <div className="flex-1">
-                <h3 className="text-lg font-semibold">{item.title}</h3>
+                {/* TÍTULO DO CARD EM BRANCO */}
+                <h3 className="text-lg font-semibold text-white">
+                  {item.title}
+                </h3>
+
                 <p className="text-sm text-gray-400 mt-1">{item.description}</p>
 
                 <span className="inline-flex items-center gap-1 text-orange-400 text-sm font-semibold mt-3 group-hover:gap-2 transition-all">

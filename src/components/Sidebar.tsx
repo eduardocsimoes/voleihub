@@ -31,24 +31,17 @@ const menuItems = [
   { id: 'overview', label: 'Visão Geral', icon: Home },
   { id: 'trajetoria', label: 'Trajetória', icon: Calendar },
   { id: 'profile', label: 'Perfil Completo', icon: User },
+  { id: 'evolucao-fisica', label: 'Evolução Física', icon: BarChart3 },
   { id: 'statistics', label: 'Estatísticas', icon: BarChart3 },
   { id: 'achievements', label: 'Conquistas', icon: Trophy },
   { id: 'ranking-atletas', label: 'Ranking de Atletas', icon: Crown },
   { id: 'ranking', label: 'Ranking Global', icon: Award },
   { id: 'xp-history', label: 'Histórico de XP', icon: TrendingUp },
-
-  // 🔥 Evolução Física (MENU PRINCIPAL, igual Trajetória)
-  { id: 'evolucao-fisica', label: 'Evolução Física', icon: BarChart3 },
-
-  // Título da categoria
   { id: 'fisica-title', label: 'Evolução Física', icon: null, isTitle: true },
-
-  // Subcategorias
   { id: 'altura', label: 'Altura', icon: Ruler },
   { id: 'salto', label: 'Salto (VJ)', icon: MoveUpRight },
   { id: 'envergadura', label: 'Envergadura & Alcance', icon: Activity },
   { id: 'forca-velocidade', label: 'Força & Velocidade', icon: Zap },
-  
   { id: 'gallery', label: 'Galeria', icon: Image },
   { id: 'documents', label: 'Documentos', icon: FileText },
   { id: 'messages', label: 'Mensagens', icon: MessageSquare, badge: 3 },

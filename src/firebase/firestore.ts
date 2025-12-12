@@ -5,6 +5,7 @@ import {
   getDocs,
   updateDoc, 
   deleteDoc,
+  addDoc,
   arrayUnion, 
   arrayRemove,
   collection,
@@ -461,6 +462,78 @@ export async function deleteHeightRecord(uid: string, recordId: string) {
   const ref = doc(db, "users", uid, "heightRecords", recordId);
   await deleteDoc(ref);
 }
+
+
+// ---------------------------------------------------------------------------
+// SALTO VERTICAL – Tipos e funções de Firestore
+// ---------------------------------------------------------------------------
+
+export interface VerticalJumpRecord {
+  id: string;
+  date: string;           // yyyy-mm-dd
+  reachStanding: number;  // alcance em pé (cm)
+  reachJump: number;      // alcance no salto (cm)
+  jumpHeight: number;     // reachJump - reachStanding (cm)
+}
+
+/**
+ * Adiciona um novo registro de salto vertical.
+ */
+export async function addVerticalJumpRecord(
+  uid: string,
+  reachStanding: number,
+  reachJump: number,
+  date: string
+): Promise<void> {
+  const jumpHeight = reachJump - reachStanding;
+
+  const ref = collection(db, "atletas", uid, "verticalJump");
+  await addDoc(ref, {
+    date,
+    reachStanding,
+    reachJump,
+    jumpHeight,
+  });
+}
+
+/**
+ * Obtém o histórico de saltos verticais do atleta, ordenado por data.
+ */
+export async function getVerticalJumpHistory(
+  uid: string
+): Promise<VerticalJumpRecord[]> {
+  const ref = collection(db, "atletas", uid, "verticalJump");
+  const q = query(ref, orderBy("date", "asc"));
+
+  const snap = await getDocs(q);
+  const items: VerticalJumpRecord[] = [];
+
+  snap.forEach((docSnap) => {
+    const data = docSnap.data() as any;
+    items.push({
+      id: docSnap.id,
+      date: data.date,
+      reachStanding: Number(data.reachStanding ?? 0),
+      reachJump: Number(data.reachJump ?? 0),
+      jumpHeight: Number(data.jumpHeight ?? 0),
+    });
+  });
+
+  return items;
+}
+
+/**
+ * Remove um registro específico de salto vertical.
+ */
+export async function deleteVerticalJumpRecord(
+  uid: string,
+  recordId: string
+): Promise<void> {
+  const ref = doc(db, "atletas", uid, "verticalJump", recordId);
+  await deleteDoc(ref);
+}
+// ---------------------------------------------------------------------------
+
 
 // ============================================================
 // ================ ACHIEVEMENTS (CRUD) ========================
