@@ -3,7 +3,7 @@
 // =========================================================
 
 export interface GrowthPoint {
-  age: number; // idade em anos (decimal)
+  age: number;    // idade em anos (decimal)
   height: number; // altura em cm
 }
 
@@ -26,13 +26,14 @@ export interface LogisticResult extends ConfidenceBand {
 
 /**
  * Dados auxiliares para refinar as previsões.
+ * (na prática usamos principalmente a última medida real)
  */
 export interface AuxGrowthData {
   sex: "M" | "F";
-  currentAge?: number; // idade atual em anos (decimal)
+  currentAge?: number;    // idade atual em anos (decimal)
   currentHeight?: number; // altura atual em cm
-  currentWeight?: number; // opcional – reservado para futuro
-  menarcaAge?: number; // se for menina
+  currentWeight?: number; // opcional – por enquanto não usamos
+  menarcaAge?: number;    // se for menina
 }
 
 // =========================================================
@@ -57,87 +58,121 @@ export function predictMidParentalHeight({
 }
 
 // =========================================================
-// ===== Curva padrão de crescimento (tipo OMS/CDC) ========
+// ====== Curvas de Referência (formato OMS-like) ==========
 // =========================================================
 //
-// Em vez de usar logística solta (que começava "colada" em 0),
-// usamos uma curva padrão de fração da altura adulta por idade,
-// baseada em valores aproximados das curvas OMS/CDC.
+// Em vez de usar função logística pura, definimos uma
+// CURVA DE REFERÊNCIA por sexo como fração da altura adulta
+// para cada idade. Depois, cada metodologia só muda a
+// ALTURA ADULTA alvo e reaproveita o mesmo formato.
 //
-// A curva final da metodologia é:
-//   altura(idade) = alturaAdultaPrevista * fração(sexo, idade)
+// Exemplo (meninas, valores aproximados):
+//  - 5 anos  ~ 110 cm  (~67% da altura adulta ~164)
+//  - 10 anos ~ 138 cm
+//  - 14 anos ~ 160 cm
+//  - 18 anos ~ 164 cm
 // =========================================================
 
-type FractionPoint = { age: number; frac: number };
+interface RefFraction {
+  age: number;      // idade em anos
+  fraction: number; // fração da altura adulta (0–1)
+}
 
-// Pontos de referência para MENINAS (F)
-// Valores aproximados da fração da altura adulta.
-const femaleFractionTable: FractionPoint[] = [
-  { age: 0, frac: 0.32 }, // ~50 cm para 157 cm
-  { age: 1, frac: 0.52 },
-  { age: 2, frac: 0.60 },
-  { age: 4, frac: 0.76 },
-  { age: 6, frac: 0.84 },
-  { age: 8, frac: 0.90 },
-  { age: 10, frac: 0.94 },
-  { age: 12, frac: 0.97 },
-  { age: 14, frac: 0.99 },
-  { age: 16, frac: 1.0 },
+// Curva de referência aproximada para meninas (percentil ~50 OMS)
+const femaleRefFractions: RefFraction[] = [
+  { age: 5, fraction: 110 / 164 },
+  { age: 6, fraction: 115 / 164 },
+  { age: 7, fraction: 120 / 164 },
+  { age: 8, fraction: 127 / 164 },
+  { age: 9, fraction: 133 / 164 },
+  { age: 10, fraction: 138 / 164 },
+  { age: 11, fraction: 145 / 164 },
+  { age: 12, fraction: 152 / 164 },
+  { age: 13, fraction: 157 / 164 },
+  { age: 14, fraction: 160 / 164 },
+  { age: 15, fraction: 162 / 164 },
+  { age: 16, fraction: 163 / 164 },
+  { age: 17, fraction: 164 / 164 },
+  { age: 18, fraction: 164 / 164 },
 ];
 
-// Pontos de referência para MENINOS (M)
-const maleFractionTable: FractionPoint[] = [
-  { age: 0, frac: 0.32 },
-  { age: 1, frac: 0.50 },
-  { age: 2, frac: 0.60 },
-  { age: 4, frac: 0.74 },
-  { age: 6, frac: 0.82 },
-  { age: 8, frac: 0.88 },
-  { age: 10, frac: 0.93 },
-  { age: 12, frac: 0.96 },
-  { age: 14, frac: 0.98 },
-  { age: 16, frac: 0.995 },
-  { age: 18, frac: 1.0 },
+// Curva de referência aproximada para meninos (percentil ~50 OMS)
+const maleRefFractions: RefFraction[] = [
+  { age: 5, fraction: 112 / 178 },
+  { age: 6, fraction: 117 / 178 },
+  { age: 7, fraction: 122 / 178 },
+  { age: 8, fraction: 127 / 178 },
+  { age: 9, fraction: 133 / 178 },
+  { age: 10, fraction: 138 / 178 },
+  { age: 11, fraction: 145 / 178 },
+  { age: 12, fraction: 152 / 178 },
+  { age: 13, fraction: 160 / 178 },
+  { age: 14, fraction: 167 / 178 },
+  { age: 15, fraction: 173 / 178 },
+  { age: 16, fraction: 176 / 178 },
+  { age: 17, fraction: 178 / 178 },
+  { age: 18, fraction: 178 / 178 },
 ];
 
-function getFractionTable(sex: "M" | "F"): FractionPoint[] {
-  return sex === "F" ? femaleFractionTable : maleFractionTable;
+function getRefTable(sex: "M" | "F"): RefFraction[] {
+  return sex === "F" ? femaleRefFractions : maleRefFractions;
 }
 
 /**
- * Interpola linearmente a fração da altura adulta para uma idade específica.
- * Retorna sempre um valor entre ~0.3 e 1.0, crescente com a idade.
+ * Interpola a fração de altura adulta para uma idade qualquer,
+ * usando a tabela de referência do sexo.
  */
-function growthFraction(sex: "M" | "F", age: number): number {
-  const table = getFractionTable(sex);
+function getReferenceFraction(sex: "M" | "F", age: number): number {
+  const table = getRefTable(sex);
 
-  if (age <= table[0].age) return table[0].frac;
-  if (age >= table[table.length - 1].age) return table[table.length - 1].frac;
+  if (age <= table[0].age) return table[0].fraction;
+  const last = table[table.length - 1];
+  if (age >= last.age) return last.fraction;
 
   for (let i = 0; i < table.length - 1; i++) {
-    const p1 = table[i];
-    const p2 = table[i + 1];
-    if (age >= p1.age && age <= p2.age) {
-      const t = (age - p1.age) / (p2.age - p1.age);
-      return p1.frac + t * (p2.frac - p1.frac);
+    const a = table[i];
+    const b = table[i + 1];
+    if (age >= a.age && age <= b.age) {
+      const t = (age - a.age) / (b.age - a.age);
+      return a.fraction + t * (b.fraction - a.fraction);
     }
   }
 
-  // fallback de segurança
-  return table[table.length - 1].frac;
+  // fallback (não deveria chegar aqui)
+  return last.fraction;
 }
 
 /**
- * Idade em que consideramos que a altura está essencialmente estável.
+ * Gera a curva "padrão" de crescimento para uma altura adulta
+ * alvo, usando as frações de referência por idade.
  */
-function getAdultAgeLimit(sex: "M" | "F"): number {
-  return sex === "F" ? 17 : 19;
+function buildReferenceCurve(
+  adultHeight: number,
+  sex: "M" | "F"
+): { age: number; height: number }[] {
+  const table = getRefTable(sex);
+  const minAge = table[0].age;
+  const maxAge = table[table.length - 1].age;
+
+  const curve: { age: number; height: number }[] = [];
+  const step = 0.25; // 3 meses
+
+  for (let age = minAge; age <= maxAge + 1e-6; age += step) {
+    const frac = getReferenceFraction(sex, age);
+    curve.push({ age, height: adultHeight * frac });
+  }
+
+  return curve;
 }
 
 // =========================================================
 // ====== Banda de Confiança Percentual (± %) ==============
 // =========================================================
 
+/**
+ * Aplica banda percentual fixa a uma curva já gerada.
+ * Mantém o MESMO formato/idades, apenas escala a altura.
+ */
 function applyConfidenceBandPercent(
   curve: { age: number; height: number }[],
   percent: number
@@ -156,66 +191,50 @@ function applyConfidenceBandPercent(
   const ciLowerAdult = last.height * (1 - percent);
   const ciUpperAdult = last.height * (1 + percent);
 
-  return {
-    lowerCurve,
-    upperCurve,
-    ciLowerAdult,
-    ciUpperAdult,
-  };
+  return { lowerCurve, upperCurve, ciLowerAdult, ciUpperAdult };
 }
 
 /**
  * Helper geral: a partir de uma altura adulta alvo,
- * monta a trajetória baseada na curva padrão OMS/CDC
- * e aplica intervalo de confiança fixo de ±1,5%.
+ * monta a trajetória + intervalo de confiança (±1,5%).
  */
 function buildResultFromAdultHeight(
   adultHeight: number,
   sex: "M" | "F"
 ): LogisticResult {
-  const adultAgeLimit = getAdultAgeLimit(sex);
-  const step = 0.25;
+  const curve = buildReferenceCurve(adultHeight, sex);
+  const adultAge =
+    curve.length > 0 ? curve[curve.length - 1].age : getRefTable(sex).slice(-1)[0].age;
 
-  const curve: { age: number; height: number }[] = [];
-
-  for (let age = 0; age <= adultAgeLimit; age += step) {
-    const frac = growthFraction(sex, age);
-    curve.push({
-      age,
-      height: adultHeight * frac,
-    });
-  }
-
-  const last = curve[curve.length - 1];
-  const band = applyConfidenceBandPercent(curve, 0.015); // ±1,5%
+  const band = applyConfidenceBandPercent(curve, 0.015); // 1,5%
 
   return {
     predictedAdultHeight: adultHeight,
     curve,
-    adultAge: last.age,
+    adultAge,
     ...band,
   };
 }
 
 // =========================================================
-// =====  Função auxiliar para “altura atual”  =============
+// =====  Função auxiliar: “altura adulta” da altura atual ==
 // =========================================================
 
 /**
  * Estima altura adulta a partir da altura atual.
  * - Para meninas com idade da menarca: usa "crescimento remanescente" típico.
- * - Caso contrário, usa a fração da curva padrão (OMS/CDC) por idade.
+ * - Caso contrário, usa fração de referência por idade.
  */
 function estimateAdultFromCurrent(
   aux: AuxGrowthData,
   mph: number | null
 ): number | null {
   const { sex, currentAge, currentHeight, menarcaAge } = aux;
-  if (!currentHeight || currentAge == null) {
+  if (!currentHeight || !currentAge) {
     return mph;
   }
 
-  // Meninas com menarca informada: usa regras de crescimento pós-menarca.
+  // Meninas com menarca informada: regras clínicas simples
   if (sex === "F" && menarcaAge != null) {
     const yearsSinceMenarca = currentAge - menarcaAge;
     let remaining: number;
@@ -239,8 +258,8 @@ function estimateAdultFromCurrent(
     return currentHeight + remaining;
   }
 
-  // Caso geral: aproxima pela fração da altura adulta da curva padrão
-  const frac = growthFraction(sex, currentAge);
+  // Caso geral: usa fração de referência por idade
+  const frac = getReferenceFraction(sex, currentAge);
   if (frac <= 0) return mph;
 
   return currentHeight / frac;
@@ -250,8 +269,8 @@ function estimateAdultFromCurrent(
 // === 2) TRAJETÓRIA Clínica (Pais) =========================
 // =========================================================
 //
-// Usa apenas o MPH como altura alvo, com curva padrão
-// e intervalo de confiança de ±1,5%.
+// Usa apenas o MPH como altura alvo. Curva de referência
+// padrão + intervalo de confiança de ±1,5%.
 // =========================================================
 
 export function buildClinicalTrajectory(
@@ -267,14 +286,14 @@ export function buildClinicalTrajectory(
 // =========================================================
 //
 // - Usa MPH como base da altura adulta.
-// - Usa uma estimativa de altura adulta baseada em dados
-//   populacionais aproximados (fração da altura por idade).
-// - NÃO utiliza toda a curva histórica, apenas altura atual
+// - Usa uma estimativa de altura adulta baseada na altura atual,
+//   via fração de referência.
+// - Não utiliza toda a curva histórica, apenas altura atual
 //   (última medida) se disponível.
 // =========================================================
 
 export function predictLogisticMixed(
-  history: GrowthPoint[], // mantido por compatibilidade (IGNORADO)
+  history: GrowthPoint[],         // mantido por compatibilidade (IGNORADO)
   mph: number | null,
   sex: "M" | "F",
   aux?: AuxGrowthData
@@ -304,7 +323,7 @@ export function predictLogisticMixed(
 // =========================================================
 
 export function predictLogisticHistory( // nome mantido só p/ compatibilidade
-  history: GrowthPoint[], // IGNORADO
+  history: GrowthPoint[],              // IGNORADO
   mph: number | null,
   sex: "M" | "F",
   aux?: AuxGrowthData
@@ -332,7 +351,7 @@ export function predictLogisticHistory( // nome mantido só p/ compatibilidade
 // =========================================================
 
 export function predictBayesianTrajectory(
-  history: GrowthPoint[], // IGNORADO
+  history: GrowthPoint[],         // IGNORADO
   mph: number | null,
   sex: "M" | "F",
   aux?: AuxGrowthData
@@ -353,34 +372,25 @@ export function predictBayesianTrajectory(
 }
 
 // =========================================================
-// ========= Curva Real (apenas liga os pontos) =============
+// ========= Curva Real (monótona, sem “encolher”) ==========
 // =========================================================
 //
-// Importante: a curva real é forçada a ser NÃO-DECRESCENTE,
-// para evitar o efeito irreal de "diminuir de altura".
+// Ordena por idade e aplica um máximo cumulativo de altura,
+// garantindo que a curva nunca diminui com o tempo.
 // =========================================================
 
 export function generateRealCurve(history: GrowthPoint[]) {
   const sorted = [...history].sort((a, b) => a.age - b.age);
 
-  const monotone: { age: number; height: number }[] = [];
-  let maxSoFar = -Infinity;
+  const curve: { age: number; height: number }[] = [];
+  let maxHeight = -Infinity;
 
   for (const p of sorted) {
-    if (!Number.isFinite(p.height)) continue;
-    if (maxSoFar < 0) {
-      maxSoFar = p.height;
-    } else {
-      if (p.height < maxSoFar) {
-        // força a não diminuir
-        maxSoFar = maxSoFar;
-      } else {
-        maxSoFar = p.height;
-      }
+    if (p.height > maxHeight) {
+      maxHeight = p.height;
     }
-
-    monotone.push({ age: p.age, height: maxSoFar });
+    curve.push({ age: p.age, height: maxHeight });
   }
 
-  return monotone;
+  return curve;
 }

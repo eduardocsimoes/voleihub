@@ -651,6 +651,54 @@ export default function AlturaAtleta() {
         </div>
       )}
 
+      {/* -------------------- TAB CADASTRO ALTURA -------------------- */}
+      {activeTab === "cadastroAltura" && (
+        <div className="space-y-8 max-w-xl">
+          <div className="bg-gray-900/70 border border-gray-700 rounded-2xl p-6 space-y-6">
+            <h2 className="text-lg font-semibold text-white">
+              Registrar Nova Altura
+            </h2>
+
+            <div className="space-y-4">
+              {/* Campo Altura */}
+              <div>
+                <label className="block text-gray-300 text-sm mb-1">
+                  Altura (cm)
+                </label>
+                <input
+                  type="number"
+                  value={heightInput}
+                  onChange={(e) => setHeightInput(e.target.value)}
+                  placeholder="Ex: 162"
+                  className="w-full px-4 py-3 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+
+              {/* Campo Data */}
+              <div>
+                <label className="block text-gray-300 text-sm mb-1">
+                  Data da Medição
+                </label>
+                <input
+                  type="date"
+                  value={dateInput}
+                  onChange={(e) => setDateInput(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleSaveHeight}
+              disabled={saving}
+              className="w-full py-3 mt-4 rounded-xl bg-orange-500 text-white font-semibold hover:bg-orange-600 disabled:opacity-60 transition"
+            >
+              {saving ? "Salvando..." : "Salvar Altura"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* -------------------- TAB HISTÓRICO -------------------- */}
       {activeTab === "historico" && (
         <div className="bg-gray-900/70 border border-gray-700 rounded-2xl p-6 space-y-5">
