@@ -9,11 +9,13 @@ import {
   arrayUnion, 
   arrayRemove,
   collection,
+  serverTimestamp,
   query,
   orderBy,
   Timestamp 
 } from 'firebase/firestore';
 import { db } from './config';
+//import { calculateJumpHeightFromHangTime } from "../utils/verticalJump";
 
 // ============================================================
 // ==================== TIPOS EXPORTADOS ======================
@@ -94,6 +96,122 @@ export interface AtletaProfile extends UserProfile {
   careerScore?: number;
   level?: number;
 }
+
+export type VerticalJumpMeasurementType = "manual" | "video";
+
+export interface UnifiedVerticalJumpRecord {
+  id: string;
+  userId: string;
+  date: string;
+  jumpHeight: number;
+  measurementType: VerticalJumpMeasurementType;
+  createdAt?: Timestamp;
+
+  // manual
+  reachStanding?: number;
+  reachJump?: number;
+
+  // video
+  video?: {
+    url: string;
+    fps: number;
+    takeOffTime: number;
+    landingTime: number;
+    hangTime: number;
+  };
+}
+
+export async function addVerticalJumpManual(
+  userId: string,
+  data: {
+    date: string;
+    sex: "M" | "F";
+    birthDate?: string;
+    reachStanding: number;
+    reachJump: number;
+  }
+) {
+  const jumpHeight = data.reachJump - data.reachStanding;
+
+  return addDoc(collection(db, "verticalJumps"), {
+    userId,
+    date: data.date,
+    createdAt: serverTimestamp(),
+
+    sex: data.sex,
+    birthDate: data.birthDate,
+
+    jumpHeight,
+    measurementType: "manual",
+
+    reachStanding: data.reachStanding,
+    reachJump: data.reachJump,
+  });
+}
+
+export async function addVerticalJumpFromVideo(
+  userId: string,
+  data: {
+    date: string;
+    sex: "M" | "F";
+    birthDate?: string;
+    videoUrl: string;
+    fps: number;
+    takeOffTime: number;
+    landingTime: number;
+    hangTime: number;
+    jumpHeight: number; // ✅ RECEBE PRONTO
+  }
+) {
+  return addDoc(collection(db, "verticalJumps"), {
+    userId,
+    date: data.date,
+    createdAt: serverTimestamp(),
+
+    sex: data.sex,
+    birthDate: data.birthDate,
+
+    jumpHeight: data.jumpHeight, // ✅ AGORA EXISTE
+
+    measurementType: "video",
+
+    video: {
+      url: data.videoUrl,
+      fps: data.fps,
+      takeOffTime: data.takeOffTime,
+      landingTime: data.landingTime,
+      hangTime: data.hangTime,
+      calculationMethod: "flight_time",
+      detection: {
+        takeOffSource: "manual",
+        landingSource: "manual",
+      },
+    },
+  });
+}
+
+export async function getVerticalJumpHistoryUnified(
+  uid: string
+): Promise<UnifiedVerticalJumpRecord[]> {
+  const q = query(
+    collection(db, "verticalJumps"),
+    orderBy("date", "asc")
+  );
+
+  const snap = await getDocs(q);
+
+  return snap.docs
+    .map((d) => ({ id: d.id, ...(d.data() as any) }))
+    .filter((r) => r.userId === uid);
+}
+
+export async function deleteVerticalJumpUnified(id: string) {
+  await deleteDoc(doc(db, "verticalJumps", id));
+}
+
+
+
+
 
 // ============================================================
 // ==================== TIPOS PARA CLUBE ======================
