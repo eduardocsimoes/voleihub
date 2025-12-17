@@ -38,46 +38,51 @@ export default function SaltoAtleta() {
     useState<UnifiedVerticalJumpRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Manual
   const [reachStanding, setReachStanding] = useState("");
   const [reachJump, setReachJump] = useState("");
   const [date, setDate] = useState("");
 
+  // Vídeo
   const [savingVideo, setSavingVideo] = useState(false);
 
+  /* =========================
+     LOAD INICIAL
+  ========================== */
   useEffect(() => {
-    async function load() {
-      const uid = auth.currentUser?.uid;
-      if (!uid) return;
+    let mounted = true;
 
-      setProfile(await getUserProfile(uid));
-      setHistory(await getVerticalJumpHistoryUnified(uid));
-      setLoading(false);
+    async function load() {
+      try {
+        const uid = auth.currentUser?.uid;
+        if (!uid) {
+          if (mounted) setLoading(false);
+          return;
+        }
+
+        const prof = await getUserProfile(uid);
+        const hist = await getVerticalJumpHistoryUnified(uid);
+
+        if (mounted) {
+          setProfile(prof);
+          setHistory(hist);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar salto:", error);
+        if (mounted) setLoading(false);
+      }
     }
+
     load();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  const bestJump = useMemo(() => {
-    if (!history.length) return null;
-    return history.reduce((a, b) =>
-      b.jumpHeight > a.jumpHeight ? b : a
-    );
-  }, [history]);
-
-  const chartData = {
-    datasets: [
-      {
-        label: "Salto Vertical (cm)",
-        data: history.map((h, i) => ({
-          x: i + 1,
-          y: h.jumpHeight,
-        })),
-        borderColor: "#f97316",
-        pointBackgroundColor: "#f97316",
-        tension: 0.3,
-      },
-    ],
-  };
-
+  /* =========================
+     SALVAR MANUAL
+  ========================== */
   async function handleSaveManual() {
     const uid = auth.currentUser?.uid;
     if (!uid || !profile) return;
@@ -85,7 +90,7 @@ export default function SaltoAtleta() {
     const rs = Number(reachStanding);
     const rj = Number(reachJump);
 
-    if (!date || rj <= rs) {
+    if (!date || rs <= 0 || rj <= rs) {
       alert("Dados inválidos.");
       return;
     }
@@ -101,17 +106,22 @@ export default function SaltoAtleta() {
     setHistory(await getVerticalJumpHistoryUnified(uid));
     setReachStanding("");
     setReachJump("");
+    setDate("");
   }
 
+  /* =========================
+     SALVAR VÍDEO
+  ========================== */
   async function handleSaveVideo(payload: VideoVerticalJumpPayload) {
     const uid = auth.currentUser?.uid;
     if (!uid || !profile) return;
-  
+
     try {
       setSavingVideo(true);
-  
+
+      // ⚠️ provisório (Storage depois)
       const fakeVideoUrl = URL.createObjectURL(payload.videoFile);
-  
+
       await addVerticalJumpFromVideo(uid, {
         date: payload.date,
         sex: profile.sex ?? "M",
@@ -123,15 +133,16 @@ export default function SaltoAtleta() {
         hangTime: payload.hangTime,
         jumpHeight: payload.jumpHeight,
       });
-  
-      const hist = await getVerticalJumpHistoryUnified(uid);
-      setHistory(hist);
+
+      setHistory(await getVerticalJumpHistoryUnified(uid));
     } finally {
       setSavingVideo(false);
     }
   }
-  
-  
+
+  /* =========================
+     DELETE
+  ========================== */
   async function handleDelete(id: string) {
     if (!confirm("Excluir este salto?")) return;
     await deleteVerticalJumpUnified(id);
@@ -142,15 +153,41 @@ export default function SaltoAtleta() {
     setHistory(await getVerticalJumpHistoryUnified(uid));
   }
 
-  if (loading) return <p className="text-gray-400">Carregando...</p>;
+  /* =========================
+     DERIVAÇÕES
+  ========================== */
+  const chartData = useMemo(() => {
+    const sorted = [...history].sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
 
+    return {
+      labels: sorted.map((h) => h.date),
+      datasets: [
+        {
+          label: "Altura do Salto (cm)",
+          data: sorted.map((h) => h.jumpHeight),
+          borderColor: "#f97316",
+          backgroundColor: "rgba(249,115,22,0.2)",
+        },
+      ],
+    };
+  }, [history]);
+
+  if (loading) {
+    return <p className="text-gray-400">Carregando...</p>;
+  }
+
+  /* =========================
+     RENDER
+  ========================== */
   return (
     <div className="max-w-6xl mx-auto space-y-8 px-4">
       <h1 className="text-3xl font-bold text-white">
         Salto Vertical
       </h1>
 
-      {/* Tabs */}
+      {/* TABS */}
       <div className="flex gap-3 border-b border-gray-800">
         {["resumo", "cadastro", "historico"].map((t) => (
           <button
@@ -167,15 +204,29 @@ export default function SaltoAtleta() {
         ))}
       </div>
 
+      {/* ================= RESUMO ================= */}
+      {activeTab === "resumo" && (
+        <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
+          {history.length === 0 ? (
+            <p className="text-gray-400">
+              Nenhum salto registrado ainda.
+            </p>
+          ) : (
+            <Line data={chartData} />
+          )}
+        </div>
+      )}
+
+      {/* ================= CADASTRO ================= */}
       {activeTab === "cadastro" && (
-        <>
+        <div className="space-y-6">
           <div className="flex gap-4">
             <button
               onClick={() => setRegisterMode("manual")}
-              className={`btn ${
+              className={`flex items-center gap-2 px-4 py-2 rounded ${
                 registerMode === "manual"
                   ? "bg-orange-500 text-white"
-                  : ""
+                  : "bg-gray-800 text-gray-300"
               }`}
             >
               <Ruler size={16} /> Manual
@@ -183,15 +234,45 @@ export default function SaltoAtleta() {
 
             <button
               onClick={() => setRegisterMode("video")}
-              className={`btn ${
+              className={`flex items-center gap-2 px-4 py-2 rounded ${
                 registerMode === "video"
                   ? "bg-orange-500 text-white"
-                  : ""
+                  : "bg-gray-800 text-gray-300"
               }`}
             >
               <Video size={16} /> Vídeo
             </button>
           </div>
+
+          {registerMode === "manual" && (
+            <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 space-y-4">
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="input"
+              />
+              <input
+                placeholder="Alcance em pé (cm)"
+                value={reachStanding}
+                onChange={(e) => setReachStanding(e.target.value)}
+                className="input"
+              />
+              <input
+                placeholder="Alcance no salto (cm)"
+                value={reachJump}
+                onChange={(e) => setReachJump(e.target.value)}
+                className="input"
+              />
+
+              <button
+                onClick={handleSaveManual}
+                className="bg-orange-500 px-4 py-2 rounded text-white"
+              >
+                Salvar Salto Manual
+              </button>
+            </div>
+          )}
 
           {registerMode === "video" && (
             <VideoVerticalJump
@@ -199,9 +280,10 @@ export default function SaltoAtleta() {
               onSave={handleSaveVideo}
             />
           )}
-        </>
+        </div>
       )}
 
+      {/* ================= HISTÓRICO ================= */}
       {activeTab === "historico" &&
         history.map((h) => (
           <div
@@ -213,7 +295,7 @@ export default function SaltoAtleta() {
                 {h.jumpHeight.toFixed(1)} cm
               </p>
               <p className="text-xs text-gray-400">
-                {h.measurementType}
+                {h.measurementType} • {h.date}
               </p>
             </div>
             <button
