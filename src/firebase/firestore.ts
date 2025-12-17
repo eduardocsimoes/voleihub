@@ -209,7 +209,6 @@ export async function deleteVerticalJumpUnified(id: string) {
   await deleteDoc(doc(db, "verticalJumps", id));
 }
 
-
 // ============================================================
 // ==================== TIPOS PARA CLUBE ======================
 // ============================================================
