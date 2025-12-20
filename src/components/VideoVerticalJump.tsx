@@ -1,8 +1,22 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Pause, Play, RotateCcw, RotateCw, UploadCloud, Trash2 } from "lucide-react";
 import { VideoVerticalJumpPayload } from "../types/VerticalJump";
+import { Pause, Play, RotateCcw, RotateCw } from "lucide-react";
+import { uploadJumpClipToStorage } from "../firebase/storage";
+import { useAuth } from "../contexts/AuthContext";
+
+/**
+ * ✅ Fix TS: captureStream existe no browser (Chrome/Edge etc),
+ * mas nem sempre existe no lib.dom.d.ts do seu projeto.
+ */
+declare global {
+  interface HTMLMediaElement {
+    captureStream?: () => MediaStream;
+    mozCaptureStream?: () => MediaStream;
+  }
+}
 
 type Props = {
+  userId: string;  
   saving?: boolean;
   onSave: (payload: VideoVerticalJumpPayload) => void;
 };
@@ -14,24 +28,129 @@ function clamp(n: number, min: number, max: number) {
 }
 
 function formatTime(t: number) {
-  if (!Number.isFinite(t)) return "0,00s";
-  // pt-BR: vírgula
-  return `${t.toFixed(2).replace(".", ",")}s`;
+  if (!Number.isFinite(t)) return "0.00s";
+  return `${t.toFixed(2)}s`;
 }
 
-// Física: h = g * t^2 / 8
+// Fórmula física: h = g * t^2 / 8  (resultado em cm)
 function heightFromHangTimeSeconds(hangTimeSeconds: number) {
   const g = 9.81;
   const hMeters = (g * hangTimeSeconds * hangTimeSeconds) / 8;
-  return hMeters * 100; // cm
+  return hMeters * 100;
 }
 
-function toPtDecimal(n: number, digits = 2) {
-  if (!Number.isFinite(n)) return "0";
-  return n.toFixed(digits).replace(".", ",");
+function getVideoCaptureStream(videoEl: HTMLVideoElement): MediaStream | null {
+  // prefer captureStream, fallback mozCaptureStream
+  const cs = videoEl.captureStream?.bind(videoEl);
+  const moz = (videoEl as any).mozCaptureStream?.bind(videoEl) as
+    | (() => MediaStream)
+    | undefined;
+
+  try {
+    return cs?.() ?? moz?.() ?? null;
+  } catch {
+    return null;
+  }
 }
 
-export default function VideoVerticalJump({ saving, onSave }: Props) {
+/**
+ * 🎬 Recorta o trecho do salto (decolagem → pouso) gravando o stream do vídeo.
+ * - Não "corta" o arquivo original; grava um novo clipe.
+ * - Funciona em browsers que suportam captureStream + MediaRecorder.
+ * - Se não suportar, retorna null (não quebra o fluxo).
+ */
+async function extractJumpClip(
+  videoEl: HTMLVideoElement,
+  startSec: number,
+  endSec: number
+): Promise<Blob | null> {
+  const stream = getVideoCaptureStream(videoEl);
+  if (!stream) return null;
+
+  if (typeof MediaRecorder === "undefined") return null;
+
+  // buffer pequeno pra evitar “corte seco” caso o frame exato esteja no limite
+  const BUFFER = 0.08; // 80ms
+  const from = Math.max(0, startSec - BUFFER);
+  const to = Math.max(from, endSec + BUFFER);
+  const clipDuration = to - from;
+
+  if (!Number.isFinite(clipDuration) || clipDuration <= 0) return null;
+
+  // tenta escolher um mimeType compatível
+  const candidates = [
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm",
+  ];
+  const mimeType =
+    candidates.find((m) => {
+      try {
+        return MediaRecorder.isTypeSupported(m);
+      } catch {
+        return false;
+      }
+    }) ?? "";
+
+  let recorder: MediaRecorder;
+  try {
+    recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+  } catch {
+    return null;
+  }
+
+  const chunks: BlobPart[] = [];
+
+  const stopped = new Promise<void>((resolve) => {
+    recorder.onstop = () => resolve();
+  });
+
+  recorder.ondataavailable = (ev) => {
+    if (ev.data && ev.data.size > 0) chunks.push(ev.data);
+  };
+
+  // garante que o vídeo está pausado antes de posicionar
+  videoEl.pause();
+
+  // posiciona no início e “começa a gravar”
+  videoEl.currentTime = from;
+
+  // aguarda o seek realmente completar
+  await new Promise<void>((resolve) => {
+    const onSeeked = () => {
+      videoEl.removeEventListener("seeked", onSeeked);
+      resolve();
+    };
+    videoEl.addEventListener("seeked", onSeeked);
+  });
+
+  recorder.start();
+
+  // toca o vídeo só durante o trecho do salto
+  try {
+    await videoEl.play();
+  } catch {
+    // se falhar (policy), ainda assim tentamos “andando” no tempo.
+  }
+
+  // para exatamente após o trecho
+  await new Promise<void>((resolve) => setTimeout(resolve, clipDuration * 1000));
+
+  videoEl.pause();
+  try {
+    recorder.stop();
+  } catch {
+    // ignore
+  }
+
+  await stopped;
+
+  if (!chunks.length) return null;
+
+  return new Blob(chunks, { type: recorder.mimeType || "video/webm" });
+}
+
+export default function VideoVerticalJump({ userId, saving, onSave }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -50,14 +169,16 @@ export default function VideoVerticalJump({ saving, onSave }: Props) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [calculated, setCalculated] = useState(false);
 
-  // Permite que o usuário carregue um exemplo (você pode trocar por um asset seu)
-  const EXAMPLE_URL =
-    "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
+  const [savingLocal, setSavingLocal] = useState(false);
 
   const fps = useMemo(() => {
     const n = Number(fpsInput);
     return Number.isFinite(n) && n > 0 ? n : 120;
   }, [fpsInput]);
+
+  // 🔁 Vídeo de exemplo (troque depois por um asset seu)
+  const EXAMPLE_URL =
+    "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
 
   useEffect(() => {
     if (!videoFile) {
@@ -108,24 +229,6 @@ export default function VideoVerticalJump({ saving, onSave }: Props) {
     }
   }
 
-  function resetMarks() {
-    setTakeOffTime(null);
-    setLandingTime(null);
-    setCalculated(false);
-  }
-
-  function clearAll() {
-    setVideoFile(null);
-    setVideoUrl("");
-    setDate("");
-    setFpsInput("120");
-    setUnit("cm");
-    setDuration(0);
-    setCurrentTime(0);
-    setIsPlaying(false);
-    resetMarks();
-  }
-
   function handleTakeOff() {
     setTakeOffTime(currentTime);
     setCalculated(false);
@@ -160,127 +263,158 @@ export default function VideoVerticalJump({ saving, onSave }: Props) {
   const jumpHeightDisplay = useMemo(() => {
     if (!jumpHeightCm) return null;
     if (unit === "cm") return jumpHeightCm;
-    return jumpHeightCm / 2.54; // polegadas
+    return jumpHeightCm / 2.54;
   }, [jumpHeightCm, unit]);
 
-  const canCalculate = useMemo(() => {
-    return !!videoFile && !!date && takeOffTime != null && landingTime != null;
-  }, [videoFile, date, takeOffTime, landingTime]);
-
-  function validateForCalculate(): { ok: boolean; message?: string } {
-    if (!videoFile) return { ok: false, message: "Selecione um vídeo." };
-    if (!date) return { ok: false, message: "Informe a data da medição." };
+  function validateForCalcOrSave() {
+    if (!videoFile) return "Selecione um vídeo.";
+    if (!date) return "Informe a data da medição.";
     if (takeOffTime == null || landingTime == null)
-      return { ok: false, message: "Marque Decolagem e Pouso." };
-    if (!hangTime || !jumpHeightCm) return { ok: false, message: "Tempo de voo inválido." };
-    return { ok: true };
+      return "Marque Decolagem e Pouso.";
+    if (!hangTime || !jumpHeightCm) return "Tempo de voo inválido.";
+    return null;
   }
 
   function handleCalculate() {
-    const v = validateForCalculate();
-    if (!v.ok) {
-      alert(v.message);
+    const err = validateForCalcOrSave();
+    if (err) {
+      alert(err);
       return;
     }
     setCalculated(true);
   }
 
-  function handleSave() {
-    const v = validateForCalculate();
-    if (!v.ok) {
-      alert(v.message);
+  /**
+   * ✅ Agora o Salvar é async, e se possível anexa clipBlob (trecho do salto)
+   */
+  async function handleSave() {
+    const err = validateForCalcOrSave();
+    if (err) {
+      alert(err);
       return;
     }
-
-    // ✅ Salvar chama onSave de verdade (é o que o SaltoAtleta espera)
-    onSave({
-      date,
-      takeOffTime: takeOffTime!,
-      landingTime: landingTime!,
-      hangTime: hangTime!,
-      jumpHeight: jumpHeightCm!, // sempre em cm no payload
-      fps,
-      videoFile: videoFile!,
-    });
+  
+    const v = getVideo();
+    if (!v) {
+      alert("Player de vídeo não encontrado.");
+      return;
+    }
+  
+    try {
+      setSavingLocal(true);
+  
+      let clipUrl: string | undefined = undefined;
+  
+      // 1️⃣ Gerar clipe entre Decolagem → Pouso
+      if (takeOffTime != null && landingTime != null) {
+        try {
+          const clipBlob = await extractJumpClip(
+            v,
+            takeOffTime,
+            landingTime
+          );
+  
+          if (clipBlob && userId) {
+            // ✅ AGORA salva corretamente
+            clipUrl = await uploadJumpClipToStorage(userId, clipBlob);
+          }
+        } catch (e) {
+          console.warn("Falha ao gerar/upload do clipe:", e);
+          // ⚠️ não quebra o fluxo
+        }
+      }
+  
+      // 2️⃣ Enviar dados consolidados para o SaltoAtleta → Firestore
+      onSave({
+        date,
+        videoUrl, // URL local do vídeo completo (preview / auditoria)
+        takeOffTime: takeOffTime!,
+        landingTime: landingTime!,
+        hangTime: hangTime!,
+        jumpHeight: jumpHeightCm!, // SEMPRE EM CM
+        fps,
+        clipUrl, // ✅ AGORA FUNCIONA
+      });
+  
+    } finally {
+      setSavingLocal(false);
+    }
   }
-
+  
   async function loadExample() {
     try {
       const res = await fetch(EXAMPLE_URL);
       const blob = await res.blob();
-      const file = new File([blob], "exemplo.mp4", { type: blob.type || "video/mp4" });
+      const file = new File([blob], "exemplo.mp4", {
+        type: blob.type || "video/mp4",
+      });
+
       setVideoFile(file);
-      resetMarks();
-      // mantém date/fps/unit como estão para não “bagunçar” a UI do usuário
+      setTakeOffTime(null);
+      setLandingTime(null);
+      setCalculated(false);
     } catch (e) {
       console.error(e);
       alert("Não foi possível carregar o vídeo de exemplo. Verifique a URL.");
     }
   }
 
+  const isSaving = Boolean(saving || savingLocal);
+
   return (
     <div className="bg-gray-900/70 border border-gray-700 rounded-2xl p-6 space-y-6">
-      {/* Header */}
       <div>
         <h2 className="text-lg font-semibold text-white">Medição por Vídeo</h2>
         <p className="text-sm text-gray-400">
-          Use <b>±1 frame</b> para precisão. Marque <b>Decolagem</b> e <b>Pouso</b>, clique em{" "}
-          <b>Calcular</b>.
+          Use <b>±1 frame</b> para precisão. Marque <b>Decolagem</b> e{" "}
+          <b>Pouso</b>, clique em <b>Calcular</b>.
         </p>
       </div>
 
       {/* Top controls */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Left: upload / example / clear */}
         <div className="lg:col-span-2">
           <div className="flex flex-col sm:flex-row gap-3">
             <label className="flex-1">
               <div className="text-xs text-gray-300 mb-1">Vídeo</div>
-
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <input
-                    type="file"
-                    accept="video/*"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0] ?? null;
-                      setVideoFile(f);
-                      resetMarks();
-                      // não mexe em date/fps/unit
-                    }}
-                    className="w-full text-sm text-gray-300
-                               file:mr-3 file:px-4 file:py-2 file:rounded-xl
-                               file:bg-gray-800 file:border file:border-gray-600
-                               file:text-gray-200 hover:file:bg-gray-700
-                               file:cursor-pointer cursor-pointer"
-                  />
-                </div>
-              </div>
+              <input
+                type="file"
+                accept="video/*"
+                onChange={(e) => {
+                  setVideoFile(e.target.files?.[0] ?? null);
+                  setTakeOffTime(null);
+                  setLandingTime(null);
+                  setCalculated(false);
+                }}
+                className="w-full text-sm text-gray-300"
+              />
             </label>
 
             <div className="flex gap-2 items-end">
               <button
                 type="button"
                 onClick={loadExample}
-                className="px-4 py-2 rounded-xl bg-gray-800 border border-gray-600 text-gray-200 hover:bg-gray-700 text-sm flex items-center gap-2"
+                className="px-4 py-2 rounded-xl bg-gray-800 border border-gray-600 text-gray-200 hover:bg-gray-700 text-sm"
               >
-                <UploadCloud className="w-4 h-4" />
                 Vídeo de Exemplo
               </button>
 
               <button
                 type="button"
-                onClick={clearAll}
-                className="px-4 py-2 rounded-xl bg-gray-800 border border-gray-600 text-gray-200 hover:bg-gray-700 text-sm flex items-center gap-2"
+                onClick={() => {
+                  setVideoFile(null);
+                  setTakeOffTime(null);
+                  setLandingTime(null);
+                  setCalculated(false);
+                }}
+                className="px-4 py-2 rounded-xl bg-gray-800 border border-gray-600 text-gray-200 hover:bg-gray-700 text-sm"
               >
-                <Trash2 className="w-4 h-4" />
                 Limpar
               </button>
             </div>
           </div>
         </div>
 
-        {/* Right: date / unit / fps */}
         <div className="space-y-2">
           <div className="grid grid-cols-2 gap-2">
             <input
@@ -314,7 +448,7 @@ export default function VideoVerticalJump({ saving, onSave }: Props) {
 
       {/* Main layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Video column */}
+        {/* Video */}
         <div className="lg:col-span-2 space-y-3">
           <div className="relative bg-black rounded-2xl overflow-hidden border border-gray-700">
             {videoUrl ? (
@@ -325,10 +459,7 @@ export default function VideoVerticalJump({ saving, onSave }: Props) {
                   className="w-full max-h-[520px] object-contain bg-black"
                   controls={false}
                   onLoadedMetadata={(e) => {
-                    const d = e.currentTarget.duration || 0;
-                    setDuration(d);
-                    // garante currentTime válido
-                    setCurrentTime((prev) => clamp(prev, 0, d || 0));
+                    setDuration(e.currentTarget.duration || 0);
                   }}
                   onTimeUpdate={(e) => {
                     setCurrentTime(e.currentTarget.currentTime);
@@ -339,7 +470,7 @@ export default function VideoVerticalJump({ saving, onSave }: Props) {
 
                 {/* Overlay controls bar */}
                 <div className="absolute left-1/2 -translate-x-1/2 bottom-4 w-[min(720px,92%)]">
-                  <div className="bg-gray-800/70 backdrop-blur-md border border-gray-600 rounded-2xl px-3 py-2 flex flex-col gap-2 shadow-2xl">
+                  <div className="bg-gray-800/70 backdrop-blur-md border border-gray-600 rounded-2xl px-3 py-2 flex flex-col gap-2">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <button
@@ -355,7 +486,7 @@ export default function VideoVerticalJump({ saving, onSave }: Props) {
                           type="button"
                           onClick={togglePlay}
                           className="p-2 rounded-lg bg-gray-900/60 hover:bg-gray-900 border border-gray-600"
-                          title="Play/Pause"
+                          title="Reproduzir/Pausar"
                         >
                           {isPlaying ? (
                             <Pause className="w-4 h-4 text-gray-200" />
@@ -376,7 +507,7 @@ export default function VideoVerticalJump({ saving, onSave }: Props) {
 
                       <div className="text-xs text-gray-200">
                         <span className="text-gray-400">tempo:</span>{" "}
-                        <b>{toPtDecimal(currentTime, 2)}</b>s{" "}
+                        <b>{currentTime.toFixed(2)}</b>s{" "}
                         <span className="text-gray-400 ml-3">fps:</span>{" "}
                         <b>{fps}</b>
                       </div>
@@ -394,7 +525,7 @@ export default function VideoVerticalJump({ saving, onSave }: Props) {
                     />
 
                     <div className="flex flex-wrap gap-2 justify-between">
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex gap-2">
                         <button
                           type="button"
                           onClick={() => stepSeconds(-0.01)}
@@ -443,12 +574,7 @@ export default function VideoVerticalJump({ saving, onSave }: Props) {
                         <button
                           type="button"
                           onClick={handleCalculate}
-                          className={`px-3 py-2 rounded-xl text-white text-sm font-semibold ${
-                            canCalculate
-                              ? "bg-orange-500 hover:bg-orange-600"
-                              : "bg-orange-500/40 cursor-not-allowed"
-                          }`}
-                          disabled={!canCalculate}
+                          className="px-3 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold"
                         >
                           Calcular
                         </button>
@@ -470,15 +596,22 @@ export default function VideoVerticalJump({ saving, onSave }: Props) {
               Como garantir uma medição correta
             </h3>
             <ul className="text-sm text-gray-300 list-disc pl-5 space-y-2">
-              <li>Se o vídeo estiver em câmera lenta, ajuste o FPS corretamente.</li>
               <li>
-                Marque a <b>Decolagem</b> no último frame antes dos pés saírem do chão.
+                Se o vídeo estiver em câmera lenta, ajuste o FPS corretamente.
               </li>
               <li>
-                Marque o <b>Pouso</b> no primeiro frame em que os pés tocam o chão novamente.
+                Marque a <b>Decolagem</b> no último frame antes dos pés saírem do
+                chão.
+              </li>
+              <li>
+                Marque o <b>Pouso</b> no primeiro frame em que os pés tocam o
+                chão novamente.
               </li>
               <li>FPS alto (120/240) aumenta a precisão do tempo de voo.</li>
-              <li>Se você aterrissar com joelhos muito dobrados, o resultado pode variar.</li>
+              <li>
+                Se você aterrissar com joelhos muito dobrados, o resultado pode
+                variar.
+              </li>
             </ul>
           </div>
         </div>
@@ -527,7 +660,7 @@ export default function VideoVerticalJump({ saving, onSave }: Props) {
             <div className="flex items-center justify-between text-sm border-t border-gray-700 pt-3">
               <span className="text-gray-300">Tempo de Voo</span>
               <span className="text-white font-semibold">
-                {hangTime == null ? "—" : `${toPtDecimal(hangTime, 2)}s`}
+                {hangTime == null ? "—" : `${hangTime.toFixed(2)}s`}
               </span>
             </div>
           </div>
@@ -539,12 +672,9 @@ export default function VideoVerticalJump({ saving, onSave }: Props) {
                 {calculated && jumpHeightDisplay != null
                   ? Math.round(jumpHeightDisplay)
                   : 0}
-                <span className="text-2xl text-gray-300 ml-1">
-                  {unit === "cm" ? "cm" : "pol"}
-                </span>
+                <span className="text-2xl text-gray-300 ml-1">{unit}</span>
               </div>
             </div>
-
             <div className="text-xs text-gray-400 mt-2">
               Clique em <b>Calcular</b> para atualizar o resultado.
             </div>
@@ -553,15 +683,20 @@ export default function VideoVerticalJump({ saving, onSave }: Props) {
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving}
+            disabled={isSaving}
             className="w-full py-3 rounded-xl bg-orange-500 text-white font-semibold hover:bg-orange-600 disabled:opacity-60"
           >
-            {saving ? "Salvando..." : "Salvar Salto"}
+            {isSaving ? "Salvando..." : "Salvar Salto"}
           </button>
 
           <div className="text-xs text-gray-400">
-            O valor salvo é sempre em <b>cm</b> (padrão do sistema). A visualização em
-            polegadas é apenas UI.
+            O valor salvo é sempre em <b>cm</b> (padrão do sistema). A
+            visualização em polegadas é apenas UI.
+          </div>
+
+          <div className="text-[11px] text-gray-500">
+            Obs.: o clipe do salto (Decolagem → Pouso) é anexado somente se o
+            navegador suportar gravação do stream do vídeo.
           </div>
         </div>
       </div>

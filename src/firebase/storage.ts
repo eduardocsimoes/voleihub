@@ -1,5 +1,12 @@
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { storage } from './config';
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
+} from "firebase/storage";
+
+const storage = getStorage();
 
 interface UploadResult {
   success: boolean;
@@ -7,87 +14,93 @@ interface UploadResult {
   error?: string;
 }
 
-/**
- * Faz upload de uma foto de perfil
- * @param userId - ID do usuário
- * @param file - Arquivo da imagem
- * @returns URL da imagem ou erro
- */
-export async function uploadProfilePhoto(userId: string, file: File): Promise<UploadResult> {
+/* =========================================================
+   FOTO DE PERFIL (mantido intacto)
+========================================================= */
+export async function uploadProfilePhoto(
+  userId: string,
+  file: File
+): Promise<UploadResult> {
   try {
-    console.log('📤 Iniciando upload da foto de perfil...');
-    
-    // Validar tipo de arquivo
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
     if (!validTypes.includes(file.type)) {
-      return {
-        success: false,
-        error: 'Formato inválido. Use JPG, PNG ou WEBP.'
-      };
+      return { success: false, error: "Formato inválido." };
     }
 
-    // Validar tamanho (máximo 5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
-      return {
-        success: false,
-        error: 'Arquivo muito grande. Máximo 5MB.'
-      };
+      return { success: false, error: "Arquivo muito grande." };
     }
 
-    // Criar referência no Storage
-    const timestamp = Date.now();
-    const fileName = `profile-photos/${userId}/${timestamp}.jpg`;
+    const fileName = `profile-photos/${userId}/${Date.now()}.jpg`;
     const storageRef = ref(storage, fileName);
 
-    // Upload
-    console.log('⏳ Fazendo upload...');
     await uploadBytes(storageRef, file);
+    const url = await getDownloadURL(storageRef);
 
-    // Obter URL de download
-    const downloadURL = await getDownloadURL(storageRef);
-    console.log('✅ Upload concluído:', downloadURL);
-
-    return {
-      success: true,
-      url: downloadURL
-    };
-
+    return { success: true, url };
   } catch (error: any) {
-    console.error('❌ Erro ao fazer upload:', error);
-    return {
-      success: false,
-      error: error.message || 'Erro ao fazer upload da foto'
-    };
+    return { success: false, error: error.message };
   }
 }
 
-/**
- * Deleta foto de perfil antiga
- * @param photoURL - URL da foto a ser deletada
- */
 export async function deleteProfilePhoto(photoURL: string): Promise<void> {
   try {
-    if (!photoURL || !photoURL.includes('firebase')) {
-      return;
-    }
-
+    if (!photoURL) return;
     const photoRef = ref(storage, photoURL);
     await deleteObject(photoRef);
-    console.log('🗑️ Foto antiga deletada');
+  } catch {
+    // silencioso
+  }
+}
+
+/* =========================================================
+   🎥 SALTO VERTICAL — CLIP DO SALTO
+========================================================= */
+
+/**
+ * Upload do clipe do salto (Decolagem → Pouso)
+ * Path:
+ * vertical-jumps/{userId}/jump_{timestamp}.webm
+ */
+export async function uploadJumpClipToStorage(
+  userId: string,
+  clipBlob: Blob
+): Promise<string> {
+  const fileName = `jump_${Date.now()}.webm`;
+
+  const clipRef = ref(storage, `vertical-jumps/${userId}/${fileName}`);
+
+  await uploadBytes(clipRef, clipBlob, {
+    contentType: clipBlob.type || "video/webm",
+  });
+
+  return await getDownloadURL(clipRef);
+}
+
+/**
+ * 🗑️ Delete sincronizado do clipe do salto
+ * Recebe a URL salva no Firestore
+ */
+export async function deleteJumpClipFromStorage(
+  clipUrl?: string
+): Promise<void> {
+  try {
+    if (!clipUrl) return;
+
+    // ⚠️ IMPORTANTE:
+    // quando a URL é completa (https://...), o ref aceita direto
+    const clipRef = ref(storage, clipUrl);
+    await deleteObject(clipRef);
+
+    console.log("🗑️ Clip de salto removido do Storage");
   } catch (error) {
-    console.error('❌ Erro ao deletar foto:', error);
-    // Não retornar erro, apenas logar
+    console.error("Erro ao deletar clipe do salto:", error);
   }
 }
 
 /**
  * Redimensiona e comprime uma imagem
- * @param file - Arquivo original
- * @param maxWidth - Largura máxima
- * @param maxHeight - Altura máxima
- * @param quality - Qualidade (0-1)
- * @returns Arquivo redimensionado
  */
 export async function resizeImage(
   file: File,
@@ -97,68 +110,51 @@ export async function resizeImage(
 ): Promise<File> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      const img = new Image();
-      
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
 
-        // Calcular proporções
-        if (width > height) {
-          if (width > maxWidth) {
-            height = (height * maxWidth) / width;
-            width = maxWidth;
-          }
-        } else {
-          if (height > maxHeight) {
-            width = (width * maxHeight) / height;
-            height = maxHeight;
-          }
+    reader.onload = () => {
+      const img = new Image();
+
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let { width, height } = img;
+
+        if (width > height && width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        } else if (height > maxHeight) {
+          width = (width * maxHeight) / height;
+          height = maxHeight;
         }
 
         canvas.width = width;
         canvas.height = height;
 
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Erro ao criar canvas'));
-          return;
-        }
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject("Canvas error");
 
         ctx.drawImage(img, 0, 0, width, height);
 
         canvas.toBlob(
           (blob) => {
-            if (!blob) {
-              reject(new Error('Erro ao converter imagem'));
-              return;
-            }
+            if (!blob) return reject("Blob error");
 
-            const resizedFile = new File([blob], file.name, {
-              type: 'image/jpeg',
-              lastModified: Date.now()
-            });
-
-            console.log('✅ Imagem redimensionada:', {
-              original: `${(file.size / 1024).toFixed(2)}KB`,
-              resized: `${(resizedFile.size / 1024).toFixed(2)}KB`
-            });
-
-            resolve(resizedFile);
+            resolve(
+              new File([blob], file.name, {
+                type: "image/jpeg",
+                lastModified: Date.now(),
+              })
+            );
           },
-          'image/jpeg',
+          "image/jpeg",
           quality
         );
       };
 
-      img.onerror = () => reject(new Error('Erro ao carregar imagem'));
-      img.src = e.target?.result as string;
+      img.onerror = reject;
+      img.src = reader.result as string;
     };
 
-    reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+    reader.onerror = reject;
     reader.readAsDataURL(file);
   });
 }

@@ -2,16 +2,16 @@ import React, { useEffect, useMemo, useState } from "react";
 import { auth } from "../../firebase/config";
 import {
   getUserProfile,
-  addVerticalJumpManual,
   addVerticalJumpFromVideo,
   getVerticalJumpHistoryUnified,
   deleteVerticalJumpUnified,
   UnifiedVerticalJumpRecord,
 } from "../../firebase/firestore";
 
-import { Trash2, Video, Ruler } from "lucide-react";
+import { Trash2, Video, Play } from "lucide-react";
 import { VideoVerticalJumpPayload } from "../../types/VerticalJump";
 import VideoVerticalJump from "../../components/VideoVerticalJump";
+import { deleteJumpClipFromStorage } from "../../firebase/storage";
 
 import {
   Chart as ChartJS,
@@ -26,25 +26,17 @@ import { Line } from "react-chartjs-2";
 ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend);
 
 type SaltoTab = "resumo" | "cadastro" | "historico";
-type RegisterMode = "manual" | "video";
 
 export default function SaltoAtleta() {
   const [activeTab, setActiveTab] = useState<SaltoTab>("resumo");
-  const [registerMode, setRegisterMode] =
-    useState<RegisterMode>("manual");
 
   const [profile, setProfile] = useState<any>(null);
-  const [history, setHistory] =
-    useState<UnifiedVerticalJumpRecord[]>([]);
+  const [history, setHistory] = useState<UnifiedVerticalJumpRecord[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Manual
-  const [reachStanding, setReachStanding] = useState("");
-  const [reachJump, setReachJump] = useState("");
-  const [date, setDate] = useState("");
-
-  // Vídeo
   const [savingVideo, setSavingVideo] = useState(false);
+
+  // modal de vídeo
+  const [videoModalUrl, setVideoModalUrl] = useState<string | null>(null);
 
   /* =========================
      LOAD INICIAL
@@ -55,10 +47,7 @@ export default function SaltoAtleta() {
     async function load() {
       try {
         const uid = auth.currentUser?.uid;
-        if (!uid) {
-          if (mounted) setLoading(false);
-          return;
-        }
+        if (!uid) return;
 
         const prof = await getUserProfile(uid);
         const hist = await getVerticalJumpHistoryUnified(uid);
@@ -81,35 +70,6 @@ export default function SaltoAtleta() {
   }, []);
 
   /* =========================
-     SALVAR MANUAL
-  ========================== */
-  async function handleSaveManual() {
-    const uid = auth.currentUser?.uid;
-    if (!uid || !profile) return;
-
-    const rs = Number(reachStanding);
-    const rj = Number(reachJump);
-
-    if (!date || rs <= 0 || rj <= rs) {
-      alert("Dados inválidos.");
-      return;
-    }
-
-    await addVerticalJumpManual(uid, {
-      date,
-      sex: profile.sex ?? "M",
-      birthDate: profile.birthDate,
-      reachStanding: rs,
-      reachJump: rj,
-    });
-
-    setHistory(await getVerticalJumpHistoryUnified(uid));
-    setReachStanding("");
-    setReachJump("");
-    setDate("");
-  }
-
-  /* =========================
      SALVAR VÍDEO
   ========================== */
   async function handleSaveVideo(payload: VideoVerticalJumpPayload) {
@@ -119,14 +79,13 @@ export default function SaltoAtleta() {
     try {
       setSavingVideo(true);
 
-      // ⚠️ provisório (Storage depois)
-      const fakeVideoUrl = URL.createObjectURL(payload.videoFile);
-
       await addVerticalJumpFromVideo(uid, {
         date: payload.date,
         sex: profile.sex ?? "M",
         birthDate: profile.birthDate,
-        videoUrl: fakeVideoUrl,
+
+        clipUrl: payload.clipUrl,
+
         fps: payload.fps,
         takeOffTime: payload.takeOffTime,
         landingTime: payload.landingTime,
@@ -135,26 +94,37 @@ export default function SaltoAtleta() {
       });
 
       setHistory(await getVerticalJumpHistoryUnified(uid));
+      setActiveTab("historico");
     } finally {
       setSavingVideo(false);
     }
   }
 
   /* =========================
-     DELETE
+     DELETE (Firestore + Storage)
   ========================== */
-  async function handleDelete(id: string) {
+  async function handleDelete(jump: UnifiedVerticalJumpRecord) {
     if (!confirm("Excluir este salto?")) return;
-    await deleteVerticalJumpUnified(id);
 
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
+    try {
+      if (jump.video?.clipUrl) {
+        await deleteJumpClipFromStorage(jump.video.clipUrl);
+      }
 
-    setHistory(await getVerticalJumpHistoryUnified(uid));
+      await deleteVerticalJumpUnified(jump.id);
+
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+
+      setHistory(await getVerticalJumpHistoryUnified(uid));
+    } catch (e) {
+      console.error("Erro ao excluir salto:", e);
+      alert("Erro ao excluir o salto.");
+    }
   }
 
   /* =========================
-     DERIVAÇÕES
+     GRÁFICO
   ========================== */
   const chartData = useMemo(() => {
     const sorted = [...history].sort((a, b) =>
@@ -183,9 +153,7 @@ export default function SaltoAtleta() {
   ========================== */
   return (
     <div className="max-w-6xl mx-auto space-y-8 px-4">
-      <h1 className="text-3xl font-bold text-white">
-        Salto Vertical
-      </h1>
+      <h1 className="text-3xl font-bold text-white">Salto Vertical</h1>
 
       {/* TABS */}
       <div className="flex gap-3 border-b border-gray-800">
@@ -219,68 +187,11 @@ export default function SaltoAtleta() {
 
       {/* ================= CADASTRO ================= */}
       {activeTab === "cadastro" && (
-        <div className="space-y-6">
-          <div className="flex gap-4">
-            <button
-              onClick={() => setRegisterMode("manual")}
-              className={`flex items-center gap-2 px-4 py-2 rounded ${
-                registerMode === "manual"
-                  ? "bg-orange-500 text-white"
-                  : "bg-gray-800 text-gray-300"
-              }`}
-            >
-              <Ruler size={16} /> Manual
-            </button>
-
-            <button
-              onClick={() => setRegisterMode("video")}
-              className={`flex items-center gap-2 px-4 py-2 rounded ${
-                registerMode === "video"
-                  ? "bg-orange-500 text-white"
-                  : "bg-gray-800 text-gray-300"
-              }`}
-            >
-              <Video size={16} /> Vídeo
-            </button>
-          </div>
-
-          {registerMode === "manual" && (
-            <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 space-y-4">
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="input"
-              />
-              <input
-                placeholder="Alcance em pé (cm)"
-                value={reachStanding}
-                onChange={(e) => setReachStanding(e.target.value)}
-                className="input"
-              />
-              <input
-                placeholder="Alcance no salto (cm)"
-                value={reachJump}
-                onChange={(e) => setReachJump(e.target.value)}
-                className="input"
-              />
-
-              <button
-                onClick={handleSaveManual}
-                className="bg-orange-500 px-4 py-2 rounded text-white"
-              >
-                Salvar Salto Manual
-              </button>
-            </div>
-          )}
-
-          {registerMode === "video" && (
-            <VideoVerticalJump
-              saving={savingVideo}
-              onSave={handleSaveVideo}
-            />
-          )}
-        </div>
+        <VideoVerticalJump
+          userId={auth.currentUser!.uid}
+          saving={savingVideo}
+          onSave={handleSaveVideo}
+        />
       )}
 
       {/* ================= HISTÓRICO ================= */}
@@ -290,22 +201,69 @@ export default function SaltoAtleta() {
             key={h.id}
             className="flex justify-between items-center bg-gray-800 p-4 rounded"
           >
-            <div>
-              <p className="text-white font-bold">
-                {h.jumpHeight.toFixed(1)} cm
-              </p>
-              <p className="text-xs text-gray-400">
-                {h.measurementType} • {h.date}
-              </p>
+            <div className="flex items-center gap-4">
+              {h.video?.clipUrl ? (
+                <video
+                  src={h.video.clipUrl}
+                  className="w-24 h-16 object-cover rounded border border-gray-700"
+                  muted
+                />
+              ) : (
+                <div className="w-24 h-16 bg-gray-700 rounded flex items-center justify-center">
+                  <Video className="text-gray-400" />
+                </div>
+              )}
+
+              <div>
+                <p className="text-white font-bold">
+                  {h.jumpHeight.toFixed(1)} cm
+                </p>
+                <p className="text-xs text-gray-400">
+                  {h.measurementType} • {h.date}
+                </p>
+              </div>
             </div>
-            <button
-              onClick={() => handleDelete(h.id)}
-              className="text-red-400"
-            >
-              <Trash2 />
-            </button>
+
+            <div className="flex gap-3">
+              {h.video?.clipUrl && (
+                <button
+                  onClick={() => setVideoModalUrl(h.video!.clipUrl!)}
+                  className="text-orange-400 hover:text-orange-300"
+                  title="Ver vídeo"
+                >
+                  <Play />
+                </button>
+              )}
+
+              <button
+                onClick={() => handleDelete(h)}
+                className="text-red-400"
+              >
+                <Trash2 />
+              </button>
+            </div>
           </div>
         ))}
+
+      {/* ================= MODAL VÍDEO ================= */}
+      {videoModalUrl && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="bg-gray-900 p-4 rounded-xl max-w-3xl w-full">
+            <video
+              src={videoModalUrl}
+              controls
+              autoPlay
+              className="w-full rounded"
+            />
+            <button
+              onClick={() => setVideoModalUrl(null)}
+              className="mt-4 w-full bg-orange-500 text-white py-2 rounded"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,12 @@
 export type MeasurementType = "video" | "manual";
 
+/* =========================
+   VÍDEO (DADOS TÉCNICOS)
+========================= */
 export interface VerticalJumpVideoData {
-  url: string;
+  url: string;               // vídeo original (upload futuro ou externo)
+  clipUrl?: string;          // 🎬 clipe do salto (Decolagem → Pouso)
+
   fps: number;
   takeOffTime: number;
   landingTime: number;
@@ -16,6 +21,9 @@ export interface VerticalJumpVideoData {
   };
 }
 
+/* =========================
+   REGISTRO BASE (FIRESTORE)
+========================= */
 export interface VerticalJumpRecord {
   id: string;
   userId: string;
@@ -25,7 +33,7 @@ export interface VerticalJumpRecord {
   sex: "M" | "F";
   birthDate?: string;
 
-  jumpHeight: number;
+  jumpHeight: number; // sempre em cm
 
   reachStanding?: number;
   reachJump?: number;
@@ -42,13 +50,44 @@ export interface VerticalJumpRecord {
   notes?: string;
 }
 
+/* =========================
+   PAYLOAD DO COMPONENTE DE VÍDEO
+========================= */
 export type VideoVerticalJumpPayload = {
-    date: string;
-    takeOffTime: number;
-    landingTime: number;
-    hangTime: number;
-    jumpHeight: number;
-    fps: number;
-    videoFile: File;
-  };
-  
+  date: string;
+
+  fps: number;
+  takeOffTime: number;
+  landingTime: number;
+  hangTime: number;
+
+  jumpHeight: number; // sempre em cm
+
+  // URLs prontas
+  videoUrl: string;
+  clipUrl?: string;
+};
+
+/* =========================
+   MODELO UNIFICADO (HISTÓRICO)
+   👉 ESSE É O QUE QUEBRAVA
+========================= */
+export interface UnifiedVerticalJumpRecord {
+  id: string;
+  userId: string;
+
+  date: string;
+  createdAt: any;
+
+  jumpHeight: number;
+  measurementType: MeasurementType;
+
+  // 🎬 auditoria por vídeo
+  videoUrl?: string;
+  clipUrl?: string;
+
+  fps?: number;
+  takeOffTime?: number;
+  landingTime?: number;
+  hangTime?: number;
+}

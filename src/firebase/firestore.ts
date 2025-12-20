@@ -16,6 +16,9 @@ import {
 } from 'firebase/firestore';
 import { db } from './config';
 //import { calculateJumpHeightFromHangTime } from "../utils/verticalJump";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+
+const storage = getStorage();
 
 // ============================================================
 // ==================== TIPOS EXPORTADOS ======================
@@ -97,6 +100,10 @@ export interface AtletaProfile extends UserProfile {
   level?: number;
 }
 
+// ============================================================
+// ==================== SALTO VERTICAL ========================
+// ============================================================
+
 export type VerticalJumpMeasurementType = "manual" | "video";
 
 export interface UnifiedVerticalJumpRecord {
@@ -111,9 +118,9 @@ export interface UnifiedVerticalJumpRecord {
   reachStanding?: number;
   reachJump?: number;
 
-  // video
+  // video (🔥 AUDITORIA 🔥)
   video?: {
-    url: string;
+    clipUrl?: string | null;
     fps: number;
     takeOffTime: number;
     landingTime: number;
@@ -121,46 +128,21 @@ export interface UnifiedVerticalJumpRecord {
   };
 }
 
-export async function addVerticalJumpManual(
-  userId: string,
-  data: {
-    date: string;
-    sex: "M" | "F";
-    birthDate?: string;
-    reachStanding: number;
-    reachJump: number;
-  }
-) {
-  const jumpHeight = data.reachJump - data.reachStanding;
-
-  return addDoc(collection(db, "verticalJumps"), {
-    userId,
-    date: data.date,
-    createdAt: serverTimestamp(),
-
-    sex: data.sex,
-    birthDate: data.birthDate,
-
-    jumpHeight,
-    measurementType: "manual",
-
-    reachStanding: data.reachStanding,
-    reachJump: data.reachJump,
-  });
-}
-
+/* =========================================================
+   VIDEO
+========================================================= */
 export async function addVerticalJumpFromVideo(
   userId: string,
   data: {
     date: string;
     sex: "M" | "F";
     birthDate?: string;
-    videoUrl: string;
     fps: number;
     takeOffTime: number;
     landingTime: number;
     hangTime: number;
-    jumpHeight: number; // ✅ RECEBE PRONTO
+    jumpHeight: number;
+    clipUrl?: string;
   }
 ) {
   return addDoc(collection(db, "verticalJumps"), {
@@ -171,25 +153,22 @@ export async function addVerticalJumpFromVideo(
     sex: data.sex,
     birthDate: data.birthDate,
 
-    jumpHeight: data.jumpHeight, // ✅ AGORA EXISTE
-
+    jumpHeight: data.jumpHeight,
     measurementType: "video",
 
     video: {
-      url: data.videoUrl,
+      clipUrl: data.clipUrl ?? null,
       fps: data.fps,
       takeOffTime: data.takeOffTime,
       landingTime: data.landingTime,
       hangTime: data.hangTime,
-      calculationMethod: "flight_time",
-      detection: {
-        takeOffSource: "manual",
-        landingSource: "manual",
-      },
     },
   });
 }
 
+/* =========================================================
+   HISTÓRICO UNIFICADO
+========================================================= */
 export async function getVerticalJumpHistoryUnified(
   uid: string
 ): Promise<UnifiedVerticalJumpRecord[]> {
@@ -201,10 +180,36 @@ export async function getVerticalJumpHistoryUnified(
   const snap = await getDocs(q);
 
   return snap.docs
-    .map((d) => ({ id: d.id, ...(d.data() as any) }))
+    .map((d) => {
+      const data = d.data();
+
+      return {
+        id: d.id,
+        userId: data.userId,
+        date: data.date,
+        jumpHeight: Number(data.jumpHeight ?? 0),
+        measurementType: data.measurementType,
+
+        reachStanding: data.reachStanding,
+        reachJump: data.reachJump,
+
+        video: data.video
+          ? {
+              clipUrl: data.video.clipUrl ?? null,
+              fps: data.video.fps,
+              takeOffTime: data.video.takeOffTime,
+              landingTime: data.video.landingTime,
+              hangTime: data.video.hangTime,
+            }
+          : undefined,
+      } as UnifiedVerticalJumpRecord;
+    })
     .filter((r) => r.userId === uid);
 }
 
+/* =========================================================
+   DELETE (Firestore only — Storage é feito fora)
+========================================================= */
 export async function deleteVerticalJumpUnified(id: string) {
   await deleteDoc(doc(db, "verticalJumps", id));
 }
