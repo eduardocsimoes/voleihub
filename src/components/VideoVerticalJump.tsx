@@ -66,23 +66,20 @@ async function extractJumpClip(
 ): Promise<Blob | null> {
   const stream = getVideoCaptureStream(videoEl);
   if (!stream) return null;
-
   if (typeof MediaRecorder === "undefined") return null;
 
-  // buffer pequeno pra evitar “corte seco” caso o frame exato esteja no limite
-  const BUFFER = 0.08; // 80ms
+  const BUFFER = 0.25;
   const from = Math.max(0, startSec - BUFFER);
   const to = Math.max(from, endSec + BUFFER);
-  const clipDuration = to - from;
 
-  if (!Number.isFinite(clipDuration) || clipDuration <= 0) return null;
+  if (!Number.isFinite(to - from) || to <= from) return null;
 
-  // tenta escolher um mimeType compatível
   const candidates = [
     "video/webm;codecs=vp9,opus",
     "video/webm;codecs=vp8,opus",
     "video/webm",
   ];
+
   const mimeType =
     candidates.find((m) => {
       try {
@@ -92,30 +89,21 @@ async function extractJumpClip(
       }
     }) ?? "";
 
-  let recorder: MediaRecorder;
-  try {
-    recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-  } catch {
-    return null;
-  }
+  const recorder = new MediaRecorder(
+    stream,
+    mimeType ? { mimeType } : undefined
+  );
 
   const chunks: BlobPart[] = [];
 
-  const stopped = new Promise<void>((resolve) => {
-    recorder.onstop = () => resolve();
-  });
-
-  recorder.ondataavailable = (ev) => {
-    if (ev.data && ev.data.size > 0) chunks.push(ev.data);
+  recorder.ondataavailable = (e) => {
+    if (e.data && e.data.size > 0) chunks.push(e.data);
   };
 
-  // garante que o vídeo está pausado antes de posicionar
+  // pausa e posiciona
   videoEl.pause();
-
-  // posiciona no início e “começa a gravar”
   videoEl.currentTime = from;
 
-  // aguarda o seek realmente completar
   await new Promise<void>((resolve) => {
     const onSeeked = () => {
       videoEl.removeEventListener("seeked", onSeeked);
@@ -126,28 +114,30 @@ async function extractJumpClip(
 
   recorder.start();
 
-  // toca o vídeo só durante o trecho do salto
-  try {
-    await videoEl.play();
-  } catch {
-    // se falhar (policy), ainda assim tentamos “andando” no tempo.
-  }
+  await videoEl.play();
 
-  // para exatamente após o trecho
-  await new Promise<void>((resolve) => setTimeout(resolve, clipDuration * 1000));
+  // 🔥 CONTROLE REAL PELO currentTime (ESSA É A CHAVE)
+  await new Promise<void>((resolve) => {
+    const checkTime = () => {
+      if (videoEl.currentTime >= to) {
+        resolve();
+      } else {
+        requestAnimationFrame(checkTime);
+      }
+    };
+    checkTime();
+  });
 
   videoEl.pause();
-  try {
-    recorder.stop();
-  } catch {
-    // ignore
-  }
+  recorder.stop();
 
-  await stopped;
+  await new Promise<void>((r) => (recorder.onstop = () => r()));
 
   if (!chunks.length) return null;
 
-  return new Blob(chunks, { type: recorder.mimeType || "video/webm" });
+  return new Blob(chunks, {
+    type: recorder.mimeType || "video/webm",
+  });
 }
 
 export default function VideoVerticalJump({ userId, saving, onSave }: Props) {
@@ -294,11 +284,12 @@ export default function VideoVerticalJump({ userId, saving, onSave }: Props) {
       return;
     }
   
-    const v = getVideo();
-    if (!v) {
+    const videoEl = videoRef.current;
+    if (!videoEl) {
       alert("Player de vídeo não encontrado.");
       return;
     }
+    
   
     try {
       setSavingLocal(true);
@@ -309,21 +300,31 @@ export default function VideoVerticalJump({ userId, saving, onSave }: Props) {
       if (takeOffTime != null && landingTime != null) {
         try {
           const clipBlob = await extractJumpClip(
-            v,
+            videoEl,        // ✅ SEMPRE o ref
             takeOffTime,
             landingTime
           );
-  
+      
           if (clipBlob && userId) {
-            // ✅ AGORA salva corretamente
             clipUrl = await uploadJumpClipToStorage(userId, clipBlob);
           }
         } catch (e) {
           console.warn("Falha ao gerar/upload do clipe:", e);
-          // ⚠️ não quebra o fluxo
         }
       }
-  
+      
+      const v = getVideo();
+      if (!v) return;
+
+      const videoMeta = {
+        duration: v.duration,
+        width: v.videoWidth,
+        height: v.videoHeight,
+        fps,
+        browser: navigator.userAgent,
+        devicePixelRatio: window.devicePixelRatio,
+      };
+      
       // 2️⃣ Enviar dados consolidados para o SaltoAtleta → Firestore
       onSave({
         date,
@@ -334,6 +335,7 @@ export default function VideoVerticalJump({ userId, saving, onSave }: Props) {
         jumpHeight: jumpHeightCm!, // SEMPRE EM CM
         fps,
         clipUrl, // ✅ AGORA FUNCIONA
+        videoMeta,
       });
   
     } finally {

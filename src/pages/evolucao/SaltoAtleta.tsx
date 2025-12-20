@@ -43,32 +43,37 @@ export default function SaltoAtleta() {
   ========================== */
   useEffect(() => {
     let mounted = true;
-
+  
     async function load() {
       try {
         const uid = auth.currentUser?.uid;
-        if (!uid) return;
-
+  
+        if (!uid) {
+          if (mounted) setLoading(false);
+          return;
+        }
+  
         const prof = await getUserProfile(uid);
         const hist = await getVerticalJumpHistoryUnified(uid);
-
-        if (mounted) {
-          setProfile(prof);
-          setHistory(hist);
-          setLoading(false);
-        }
+  
+        if (!mounted) return;
+  
+        setProfile(prof);
+        setHistory(hist);
+        setLoading(false);
       } catch (error) {
         console.error("Erro ao carregar salto:", error);
         if (mounted) setLoading(false);
       }
     }
-
+  
     load();
+  
     return () => {
       mounted = false;
     };
   }, []);
-
+  
   /* =========================
      SALVAR VÍDEO
   ========================== */
@@ -91,6 +96,7 @@ export default function SaltoAtleta() {
         landingTime: payload.landingTime,
         hangTime: payload.hangTime,
         jumpHeight: payload.jumpHeight,
+        videoMeta: payload.videoMeta,
       });
 
       setHistory(await getVerticalJumpHistoryUnified(uid));
@@ -247,20 +253,48 @@ export default function SaltoAtleta() {
 
       {/* ================= MODAL VÍDEO ================= */}
       {videoModalUrl && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-gray-900 p-4 rounded-xl max-w-3xl w-full">
-            <video
-              src={videoModalUrl}
-              controls
-              autoPlay
-              className="w-full rounded"
-            />
-            <button
-              onClick={() => setVideoModalUrl(null)}
-              className="mt-4 w-full bg-orange-500 text-white py-2 rounded"
-            >
-              Fechar
-            </button>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          onClick={() => setVideoModalUrl(null)} // clique fora fecha
+        >
+          <div
+            className="relative bg-gray-900 rounded-2xl shadow-2xl border border-gray-700 w-[90vw] max-w-4xl"
+            onClick={(e) => e.stopPropagation()} // impede fechar ao clicar no vídeo
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+              <h3 className="text-white font-semibold text-sm">
+                Visualização do Salto
+              </h3>
+
+              <button
+                onClick={() => setVideoModalUrl(null)}
+                className="text-gray-400 hover:text-white text-xl leading-none"
+                aria-label="Fechar"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Vídeo */}
+            <div className="p-4">
+              <video
+                src={videoModalUrl}
+                controls
+                autoPlay
+                className="w-full max-h-[70vh] rounded-lg bg-black"
+              />
+            </div>
+
+            {/* Footer */}
+            <div className="px-4 pb-4 text-right">
+              <button
+                onClick={() => setVideoModalUrl(null)}
+                className="px-4 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-600"
+              >
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}

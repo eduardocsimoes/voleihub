@@ -126,10 +126,22 @@ export interface UnifiedVerticalJumpRecord {
     landingTime: number;
     hangTime: number;
   };
+
+  videoMeta?: {
+    duration: number;
+    width: number;
+    height: number;
+    fps: number;
+    browser: string;
+    devicePixelRatio: number;
+  };  
 }
 
 /* =========================================================
    VIDEO
+========================================================= */
+/* =========================================================
+   VIDEO — SALTO VERTICAL (COM AUDITORIA)
 ========================================================= */
 export async function addVerticalJumpFromVideo(
   userId: string,
@@ -137,12 +149,24 @@ export async function addVerticalJumpFromVideo(
     date: string;
     sex: "M" | "F";
     birthDate?: string;
+
     fps: number;
     takeOffTime: number;
     landingTime: number;
     hangTime: number;
     jumpHeight: number;
+
     clipUrl?: string;
+
+    // 🔥 AUDITORIA ANTIFRAUDE
+    videoMeta?: {
+      duration: number;
+      width: number;
+      height: number;
+      fps: number;
+      browser: string;
+      devicePixelRatio: number;
+    };
   }
 ) {
   return addDoc(collection(db, "verticalJumps"), {
@@ -151,7 +175,7 @@ export async function addVerticalJumpFromVideo(
     createdAt: serverTimestamp(),
 
     sex: data.sex,
-    birthDate: data.birthDate,
+    birthDate: data.birthDate ?? null,
 
     jumpHeight: data.jumpHeight,
     measurementType: "video",
@@ -163,6 +187,9 @@ export async function addVerticalJumpFromVideo(
       landingTime: data.landingTime,
       hangTime: data.hangTime,
     },
+
+    // ✅ agora existe de verdade
+    videoMeta: data.videoMeta ?? null,
   });
 }
 

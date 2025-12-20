@@ -55,18 +55,25 @@ export interface VerticalJumpRecord {
 ========================= */
 export type VideoVerticalJumpPayload = {
   date: string;
-
   fps: number;
   takeOffTime: number;
   landingTime: number;
   hangTime: number;
+  jumpHeight: number;
 
-  jumpHeight: number; // sempre em cm
-
-  // URLs prontas
   videoUrl: string;
   clipUrl?: string;
+
+  videoMeta?: {
+    duration: number;
+    width: number;
+    height: number;
+    fps: number;
+    browser: string;
+    devicePixelRatio: number;
+  };
 };
+
 
 /* =========================
    MODELO UNIFICADO (HISTÓRICO)
