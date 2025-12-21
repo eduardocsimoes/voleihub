@@ -17,6 +17,7 @@ import {
 import { db } from './config';
 //import { calculateJumpHeightFromHangTime } from "../utils/verticalJump";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { JumpType } from "../types/VerticalJump";
 
 const storage = getStorage();
 
@@ -110,6 +111,7 @@ export interface UnifiedVerticalJumpRecord {
   id: string;
   userId: string;
   date: string;
+  jumpType: JumpType;
   jumpHeight: number;
   measurementType: VerticalJumpMeasurementType;
   createdAt?: Timestamp;
@@ -150,7 +152,7 @@ export async function addVerticalJumpFromVideo(
     date: string;
     sex: "M" | "F";
     birthDate?: string;
-
+    jumpType: JumpType;
     fps: number;
     takeOffTime: number;
     landingTime: number;
@@ -174,6 +176,8 @@ export async function addVerticalJumpFromVideo(
     userId,
     date: data.date,
     createdAt: serverTimestamp(),
+
+    jumpType: data.jumpType,
 
     sex: data.sex,
     birthDate: data.birthDate ?? null,
@@ -216,6 +220,7 @@ export async function getVerticalJumpHistoryUnified(
         id: d.id,
         userId: data.userId,
         date: data.date,
+        jumpType: data.jumpType,
         jumpHeight: Number(data.jumpHeight ?? 0),
         measurementType: data.measurementType,
 

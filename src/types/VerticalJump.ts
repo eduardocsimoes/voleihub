@@ -55,6 +55,7 @@ export interface VerticalJumpRecord {
 ========================= */
 export type VideoVerticalJumpPayload = {
   date: string;
+  jumpType: JumpType;
   fps: number;
   takeOffTime: number;
   landingTime: number;
@@ -98,3 +99,19 @@ export interface UnifiedVerticalJumpRecord {
   landingTime?: number;
   hangTime?: number;
 }
+
+// ======================================================
+// TIPOS DE SALTO (OFICIAL DO SISTEMA)
+// ======================================================
+
+export const JUMP_TYPES = [
+  "Salto Vertical com Contramovimento",
+  "Salto Vertical Sem Contramovimento",
+  "Salto Vertical com Alcance",
+  "Salto de Ataque com Passada",
+  "Salto de Ataque Sem Passada",
+  "Salto de Bloqueio Parado",
+  "Salto de Bloqueio Lateral",
+] as const;
+
+export type JumpType = typeof JUMP_TYPES[number];

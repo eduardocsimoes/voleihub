@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { VideoVerticalJumpPayload } from "../types/VerticalJump";
+import { VideoVerticalJumpPayload, JUMP_TYPES, JumpType } from "../types/VerticalJump";
 import { Pause, Play, RotateCcw, RotateCw, Video } from "lucide-react";
 import { uploadJumpClipToStorage, uploadJumpThumbnailToStorage } from "../firebase/storage";
 import { useAuth } from "../contexts/AuthContext";
@@ -178,6 +178,8 @@ export default function VideoVerticalJump({ userId, saving, onSave }: Props) {
   const [videoUrl, setVideoUrl] = useState<string>("");
 
   const [date, setDate] = useState("");
+  const [jumpType, setJumpType] = useState<JumpType | null>(null);
+
   const [fpsInput, setFpsInput] = useState("120");
   const [unit, setUnit] = useState<Unit>("cm");
 
@@ -290,6 +292,7 @@ export default function VideoVerticalJump({ userId, saving, onSave }: Props) {
   function validateForCalcOrSave() {
     if (!videoFile) return "Selecione um vídeo.";
     if (!date) return "Informe a data da medição.";
+    if (!jumpType) return "Selecione o tipo de salto.";
     if (takeOffTime == null || landingTime == null)
       return "Marque Decolagem e Pouso.";
     if (!hangTime || !jumpHeightCm) return "Tempo de voo inválido.";
@@ -375,6 +378,7 @@ export default function VideoVerticalJump({ userId, saving, onSave }: Props) {
       // 2️⃣ Enviar dados consolidados para o SaltoAtleta → Firestore
       onSave({
         date,
+        jumpType: jumpType as JumpType,
         videoUrl, // URL local do vídeo completo (preview / auditoria)
         takeOffTime: takeOffTime!,
         landingTime: landingTime!,
@@ -424,6 +428,52 @@ export default function VideoVerticalJump({ userId, saving, onSave }: Props) {
       {/* Top controls */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
+
+        <div className="grid grid-cols-1 gap-2">
+        {/* Tipo de Salto */}
+        <div className="space-y-1">
+          {/*<label className="text-xs text-gray-400">Tipo de Salto</label>*/}
+          <select
+            value={jumpType ?? ""}
+            onChange={(e) => setJumpType(e.target.value as JumpType)}
+            className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white text-sm"
+          >
+            {/* Placeholder descritivo (não selecionável) */}
+            <option value="" disabled>
+              Selecione o tipo de salto (ex: ataque, bloqueio, vertical)
+            </option>
+
+            {JUMP_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+        </div>
+
+
+  {/* Data + Unidade */}
+  <div className="grid grid-cols-2 gap-2">
+    <input
+      type="date"
+      value={date}
+      onChange={(e) => setDate(e.target.value)}
+      className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white text-sm"
+    />
+
+    <select
+      value={unit}
+      onChange={(e) => setUnit(e.target.value as Unit)}
+      className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white text-sm"
+    >
+      <option value="cm">cm</option>
+      <option value="in">polegadas</option>
+    </select>
+  </div>
+</div>
+
+
+
           <div className="flex flex-col sm:flex-row gap-3">
             <label className="flex flex-col items-center justify-center gap-3 w-full p-6 border-2 border-dashed border-gray-600 rounded-2xl cursor-pointer hover:border-orange-500 hover:bg-gray-800/40 transition">
               <input

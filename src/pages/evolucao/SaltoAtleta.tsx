@@ -27,6 +27,19 @@ ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend);
 
 type SaltoTab = "resumo" | "cadastro" | "historico";
 
+function groupJumpsByType(records: UnifiedVerticalJumpRecord[]) {
+  return records.reduce<Record<string, UnifiedVerticalJumpRecord[]>>(
+    (acc, record) => {
+      if (!acc[record.jumpType]) {
+        acc[record.jumpType] = [];
+      }
+      acc[record.jumpType].push(record);
+      return acc;
+    },
+    {}
+  );
+}
+
 export default function SaltoAtleta() {
   const [activeTab, setActiveTab] = useState<SaltoTab>("resumo");
 
@@ -35,6 +48,10 @@ export default function SaltoAtleta() {
   const [loading, setLoading] = useState(true);
   const [savingVideo, setSavingVideo] = useState(false);
 
+  const groupedByType = useMemo(() => {
+    return groupJumpsByType(history);
+  }, [history]);
+  
   // modal de vídeo
   const [videoModalUrl, setVideoModalUrl] = useState<string | null>(null);
 
@@ -67,6 +84,8 @@ export default function SaltoAtleta() {
       }
     }
   
+
+
     load();
   
     return () => {
@@ -86,6 +105,7 @@ export default function SaltoAtleta() {
 
       await addVerticalJumpFromVideo(uid, {
         date: payload.date,
+        jumpType: payload.jumpType,
         sex: profile.sex ?? "M",
         birthDate: profile.birthDate,
 
