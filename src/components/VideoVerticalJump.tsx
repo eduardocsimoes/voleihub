@@ -452,101 +452,84 @@ export default function VideoVerticalJump({ userId, saving, onSave }: Props) {
         </div>
 
 
-  {/* Data + Unidade */}
-  <div className="grid grid-cols-2 gap-2">
-    <input
-      type="date"
-      value={date}
-      onChange={(e) => setDate(e.target.value)}
-      className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white text-sm"
-    />
+        {/* Data + Unidade */}
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white text-sm"
+          />
 
-    <select
-      value={unit}
-      onChange={(e) => setUnit(e.target.value as Unit)}
-      className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white text-sm"
-    >
-      <option value="cm">cm</option>
-      <option value="in">polegadas</option>
-    </select>
-  </div>
-</div>
+          <select
+            value={unit}
+            onChange={(e) => setUnit(e.target.value as Unit)}
+            className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white text-sm"
+          >
+            <option value="cm">cm</option>
+            <option value="in">polegadas</option>
+            </select>
+        </div>
+      </div>
 
+      {/* ================== VÍDEO ================== */}
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-3">
+        {/* Selecionar vídeo */}
+        <label className="md:col-span-2 flex flex-col items-center justify-center h-20 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:border-orange-500 hover:bg-gray-800/40 transition">
+          <input
+            key={fileInputKey}
+            type="file"
+            accept="video/*"
+            className="hidden"
+            onChange={(e) => {
+              setVideoFile(e.target.files?.[0] ?? null);
+              setTakeOffTime(null);
+              setLandingTime(null);
+              setCalculated(false);
+            }}
+          />
 
-
-          <div className="flex flex-col sm:flex-row gap-3">
-            <label className="flex flex-col items-center justify-center gap-3 w-full p-6 border-2 border-dashed border-gray-600 rounded-2xl cursor-pointer hover:border-orange-500 hover:bg-gray-800/40 transition">
-              <input
-                key={fileInputKey}
-                type="file"
-                accept="video/*"
-                className="hidden"
-                onChange={(e) => {
-                  setVideoFile(e.target.files?.[0] ?? null);
-                  setTakeOffTime(null);
-                  setLandingTime(null);
-                  setCalculated(false);
-                }}
-              />
-
-              <div className="flex items-center gap-3 text-orange-400">
-                <Video className="w-6 h-6" />
-                <span className="font-semibold">
-                  {videoFile ? "Trocar vídeo" : "Selecionar vídeo do salto"}
-                </span>
-              </div>
-
-              <p className="text-xs text-gray-400 text-center">
-                {videoFile
-                  ? videoFile.name
-                  : "Formatos suportados: MP4, MOV, WEBM"}
-              </p>
-            </label>
-
-            <div className="flex gap-2 items-end">
-              <button
-                type="button"
-                onClick={loadExample}
-                className="px-4 py-2 rounded-xl bg-gray-800 border border-gray-600 text-gray-200 hover:bg-gray-700 text-sm"
-              >
-                Vídeo de Exemplo
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setVideoFile(null);
-                  setTakeOffTime(null);
-                  setLandingTime(null);
-                  setCalculated(false);
-
-                  setFileInputKey((k) => k + 1);
-                }}
-                className="px-4 py-2 rounded-xl bg-gray-800 border border-gray-600 text-gray-200 hover:bg-gray-700 text-sm"
-              >
-                Limpar
-              </button>
-            </div>
+          <div className="flex items-center gap-2 text-orange-400">
+            <Video className="w-5 h-5" />
+            <span className="font-semibold text-sm">
+              {videoFile ? "Trocar vídeo do salto" : "Selecionar vídeo do salto"}
+            </span>
           </div>
+
+          <span className="text-xs text-gray-400 mt-1">
+            MP4, MOV ou WEBM
+          </span>
+        </label>
+
+        {/* Botões à direita */}
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={loadExample}
+            className="h-20 rounded-xl bg-gray-800 border border-gray-600 text-gray-200 hover:bg-gray-700 text-sm flex items-center justify-center text-center"
+          >
+            Vídeo de Exemplo
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setVideoFile(null);
+              setTakeOffTime(null);
+              setLandingTime(null);
+              setCalculated(false);
+              setFileInputKey((k) => k + 1);
+            }}
+            className="h-20 rounded-xl bg-gray-800 border border-gray-600 text-gray-200 hover:bg-gray-700 text-sm flex items-center justify-center"
+          >
+            Limpar
+          </button>
+        </div>
+      </div>
+
         </div>
 
-        <div className="space-y-2">
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white text-sm"
-            />
-            <select
-              value={unit}
-              onChange={(e) => setUnit(e.target.value as Unit)}
-              className="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white text-sm"
-            >
-              <option value="cm">cm</option>
-              <option value="in">polegadas</option>
-            </select>
-          </div>
+        {/*<div className="space-y-2">
 
           <input
             value={fpsInput}
@@ -558,7 +541,7 @@ export default function VideoVerticalJump({ userId, saving, onSave }: Props) {
           <div className="text-xs text-gray-400">
             Dica: para <i>slow motion</i>, use 120/240 FPS.
           </div>
-        </div>
+          </div>*/}
       </div>
 
       {/* Main layout */}

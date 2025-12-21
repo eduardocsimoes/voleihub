@@ -83,8 +83,6 @@ export default function SaltoAtleta() {
         if (mounted) setLoading(false);
       }
     }
-  
-
 
     load();
   
@@ -153,23 +151,52 @@ export default function SaltoAtleta() {
      GRÁFICO
   ========================== */
   const chartData = useMemo(() => {
-    const sorted = [...history].sort((a, b) =>
-      a.date.localeCompare(b.date)
+    if (history.length === 0) {
+      return {
+        labels: [],
+        datasets: [],
+      };
+    }
+  
+    const grouped = history.reduce<Record<string, UnifiedVerticalJumpRecord[]>>(
+      (acc, record) => {
+        if (!acc[record.jumpType]) {
+          acc[record.jumpType] = [];
+        }
+        acc[record.jumpType].push(record);
+        return acc;
+      },
+      {}
     );
-
+  
+    const allDates = Array.from(
+      new Set(history.map((h) => h.date))
+    ).sort();
+  
+    const datasets = Object.entries(grouped).map(
+      ([jumpType, records], index) => {
+        const byDate = new Map(
+          records.map((r) => [r.date, r.jumpHeight])
+        );
+  
+        return {
+          label: jumpType,
+          data: allDates.map((d) => byDate.get(d) ?? null),
+          borderColor: `hsl(${index * 60}, 80%, 55%)`,
+          backgroundColor: `hsla(${index * 60}, 80%, 55%, 0.2)`,
+          tension: 0.3,
+          spanGaps: true,
+        };
+      }
+    );
+  
     return {
-      labels: sorted.map((h) => h.date),
-      datasets: [
-        {
-          label: "Altura do Salto (cm)",
-          data: sorted.map((h) => h.jumpHeight),
-          borderColor: "#f97316",
-          backgroundColor: "rgba(249,115,22,0.2)",
-        },
-      ],
+      labels: allDates,
+      datasets,
     };
   }, [history]);
-
+    
+  
   if (loading) {
     return <p className="text-gray-400">Carregando...</p>;
   }
@@ -222,29 +249,41 @@ export default function SaltoAtleta() {
 
       {/* ================= HISTÓRICO ================= */}
       {activeTab === "historico" &&
-        history.map((h) => (
+  Object.entries(groupedByType).map(([jumpType, records]) => {
+    const ordered = [...records].sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
+
+    return (
+      <div key={jumpType} className="space-y-4">
+        {/* TÍTULO DO TIPO */}
+        <h3 className="text-lg font-semibold text-orange-400 mt-6">
+          {jumpType}
+        </h3>
+
+        {ordered.map((h) => (
           <div
             key={h.id}
             className="flex justify-between items-center bg-gray-800 p-4 rounded"
           >
             <div className="flex items-center gap-4">
-            {h.video?.thumbnailUrl ? (
-              <img
-                src={h.video.thumbnailUrl}
-                alt="Thumbnail do salto"
-                className="w-24 h-16 object-cover rounded border border-gray-700"
-              />
-            ) : h.video?.clipUrl ? (
-              <video
-                src={h.video.clipUrl}
-                className="w-24 h-16 object-cover rounded border border-gray-700"
-                muted
-              />
-            ) : (
-              <div className="w-24 h-16 bg-gray-700 rounded flex items-center justify-center">
-                <Video className="text-gray-400" />
-              </div>
-            )}
+              {h.video?.thumbnailUrl ? (
+                <img
+                  src={h.video.thumbnailUrl}
+                  alt="Thumbnail do salto"
+                  className="w-24 h-16 object-cover rounded border border-gray-700"
+                />
+              ) : h.video?.clipUrl ? (
+                <video
+                  src={h.video.clipUrl}
+                  className="w-24 h-16 object-cover rounded border border-gray-700"
+                  muted
+                />
+              ) : (
+                <div className="w-24 h-16 bg-gray-700 rounded flex items-center justify-center">
+                  <Video className="text-gray-400" />
+                </div>
+              )}
 
               <div>
                 <p className="text-white font-bold">
@@ -276,6 +315,10 @@ export default function SaltoAtleta() {
             </div>
           </div>
         ))}
+      </div>
+    );
+  })}
+
 
       {/* ================= MODAL VÍDEO ================= */}
       {videoModalUrl && (
