@@ -1,13 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { VideoVerticalJumpPayload } from "../types/VerticalJump";
-import { Pause, Play, RotateCcw, RotateCw } from "lucide-react";
-import { uploadJumpClipToStorage } from "../firebase/storage";
+import { Pause, Play, RotateCcw, RotateCw, Video } from "lucide-react";
+import { uploadJumpClipToStorage, uploadJumpThumbnailToStorage } from "../firebase/storage";
 import { useAuth } from "../contexts/AuthContext";
 
-/**
- * ✅ Fix TS: captureStream existe no browser (Chrome/Edge etc),
- * mas nem sempre existe no lib.dom.d.ts do seu projeto.
- */
 declare global {
   interface HTMLMediaElement {
     captureStream?: () => MediaStream;
@@ -140,9 +136,44 @@ async function extractJumpClip(
   });
 }
 
+async function generateJumpThumbnail(
+  videoEl: HTMLVideoElement,
+  atTime: number
+): Promise<Blob | null> {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  // posiciona no frame desejado
+  videoEl.pause();
+  videoEl.currentTime = atTime;
+
+  await new Promise<void>((resolve) => {
+    const onSeeked = () => {
+      videoEl.removeEventListener("seeked", onSeeked);
+      resolve();
+    };
+    videoEl.addEventListener("seeked", onSeeked);
+  });
+
+  canvas.width = videoEl.videoWidth;
+  canvas.height = videoEl.videoHeight;
+
+  ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+
+  return new Promise((resolve) => {
+    canvas.toBlob(
+      (blob) => resolve(blob),
+      "image/jpeg",
+      0.85 // qualidade
+    );
+  });
+}
+
 export default function VideoVerticalJump({ userId, saving, onSave }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
+  const [fileInputKey, setFileInputKey] = useState(0);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string>("");
 
@@ -295,6 +326,7 @@ export default function VideoVerticalJump({ userId, saving, onSave }: Props) {
       setSavingLocal(true);
   
       let clipUrl: string | undefined = undefined;
+      let thumbnailUrl: string | undefined = undefined;
   
       // 1️⃣ Gerar clipe entre Decolagem → Pouso
       if (takeOffTime != null && landingTime != null) {
@@ -305,9 +337,24 @@ export default function VideoVerticalJump({ userId, saving, onSave }: Props) {
             landingTime
           );
       
+          let thumbnailUrl: string | undefined;
+
           if (clipBlob && userId) {
             clipUrl = await uploadJumpClipToStorage(userId, clipBlob);
+          
+            // 📸 thumbnail no meio do voo
+            const midTime = (takeOffTime! + landingTime!) / 2;
+          
+            const thumbBlob = await generateJumpThumbnail(videoEl, midTime);
+          
+            if (thumbBlob) {
+              thumbnailUrl = await uploadJumpThumbnailToStorage(
+                userId,
+                thumbBlob
+              );
+            }
           }
+                    
         } catch (e) {
           console.warn("Falha ao gerar/upload do clipe:", e);
         }
@@ -335,6 +382,7 @@ export default function VideoVerticalJump({ userId, saving, onSave }: Props) {
         jumpHeight: jumpHeightCm!, // SEMPRE EM CM
         fps,
         clipUrl, // ✅ AGORA FUNCIONA
+        thumbnailUrl,
         videoMeta,
       });
   
@@ -377,19 +425,32 @@ export default function VideoVerticalJump({ userId, saving, onSave }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
           <div className="flex flex-col sm:flex-row gap-3">
-            <label className="flex-1">
-              <div className="text-xs text-gray-300 mb-1">Vídeo</div>
+            <label className="flex flex-col items-center justify-center gap-3 w-full p-6 border-2 border-dashed border-gray-600 rounded-2xl cursor-pointer hover:border-orange-500 hover:bg-gray-800/40 transition">
               <input
+                key={fileInputKey}
                 type="file"
                 accept="video/*"
+                className="hidden"
                 onChange={(e) => {
                   setVideoFile(e.target.files?.[0] ?? null);
                   setTakeOffTime(null);
                   setLandingTime(null);
                   setCalculated(false);
                 }}
-                className="w-full text-sm text-gray-300"
               />
+
+              <div className="flex items-center gap-3 text-orange-400">
+                <Video className="w-6 h-6" />
+                <span className="font-semibold">
+                  {videoFile ? "Trocar vídeo" : "Selecionar vídeo do salto"}
+                </span>
+              </div>
+
+              <p className="text-xs text-gray-400 text-center">
+                {videoFile
+                  ? videoFile.name
+                  : "Formatos suportados: MP4, MOV, WEBM"}
+              </p>
             </label>
 
             <div className="flex gap-2 items-end">
@@ -408,6 +469,8 @@ export default function VideoVerticalJump({ userId, saving, onSave }: Props) {
                   setTakeOffTime(null);
                   setLandingTime(null);
                   setCalculated(false);
+
+                  setFileInputKey((k) => k + 1);
                 }}
                 className="px-4 py-2 rounded-xl bg-gray-800 border border-gray-600 text-gray-200 hover:bg-gray-700 text-sm"
               >

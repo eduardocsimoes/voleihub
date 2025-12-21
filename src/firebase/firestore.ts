@@ -121,6 +121,7 @@ export interface UnifiedVerticalJumpRecord {
   // video (🔥 AUDITORIA 🔥)
   video?: {
     clipUrl?: string | null;
+    thumbnailUrl?: string | null;
     fps: number;
     takeOffTime: number;
     landingTime: number;
@@ -157,7 +158,7 @@ export async function addVerticalJumpFromVideo(
     jumpHeight: number;
 
     clipUrl?: string;
-
+    thumbnailUrl?: string;
     // 🔥 AUDITORIA ANTIFRAUDE
     videoMeta?: {
       duration: number;
@@ -182,6 +183,7 @@ export async function addVerticalJumpFromVideo(
 
     video: {
       clipUrl: data.clipUrl ?? null,
+      thumbnailUrl: data.thumbnailUrl ?? null,
       fps: data.fps,
       takeOffTime: data.takeOffTime,
       landingTime: data.landingTime,
@@ -221,14 +223,15 @@ export async function getVerticalJumpHistoryUnified(
         reachJump: data.reachJump,
 
         video: data.video
-          ? {
-              clipUrl: data.video.clipUrl ?? null,
-              fps: data.video.fps,
-              takeOffTime: data.video.takeOffTime,
-              landingTime: data.video.landingTime,
-              hangTime: data.video.hangTime,
-            }
-          : undefined,
+        ? {
+            clipUrl: data.video.clipUrl ?? null,
+            thumbnailUrl: data.video.thumbnailUrl ?? null, // ✅ AQUI ESTÁ O BUG
+            fps: data.video.fps,
+            takeOffTime: data.video.takeOffTime,
+            landingTime: data.video.landingTime,
+            hangTime: data.video.hangTime,
+          }
+        : undefined,
       } as UnifiedVerticalJumpRecord;
     })
     .filter((r) => r.userId === uid);

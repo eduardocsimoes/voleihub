@@ -158,3 +158,26 @@ export async function resizeImage(
     reader.readAsDataURL(file);
   });
 }
+
+/**
+ * 🖼️ Upload da thumbnail do salto
+ * Path:
+ * vertical-jumps/{userId}/thumb_{timestamp}.jpg
+ */
+export async function uploadJumpThumbnailToStorage(
+  userId: string,
+  thumbnailBlob: Blob
+): Promise<string> {
+  const fileName = `thumb_${Date.now()}.jpg`;
+
+  const thumbRef = ref(
+    storage,
+    `vertical-jumps/${userId}/${fileName}`
+  );
+
+  await uploadBytes(thumbRef, thumbnailBlob, {
+    contentType: "image/jpeg",
+  });
+
+  return getDownloadURL(thumbRef);
+}

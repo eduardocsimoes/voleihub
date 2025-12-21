@@ -63,7 +63,7 @@ export type VideoVerticalJumpPayload = {
 
   videoUrl: string;
   clipUrl?: string;
-
+  thumbnailUrl?: string;
   videoMeta?: {
     duration: number;
     width: number;

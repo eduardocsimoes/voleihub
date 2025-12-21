@@ -208,17 +208,23 @@ export default function SaltoAtleta() {
             className="flex justify-between items-center bg-gray-800 p-4 rounded"
           >
             <div className="flex items-center gap-4">
-              {h.video?.clipUrl ? (
-                <video
-                  src={h.video.clipUrl}
-                  className="w-24 h-16 object-cover rounded border border-gray-700"
-                  muted
-                />
-              ) : (
-                <div className="w-24 h-16 bg-gray-700 rounded flex items-center justify-center">
-                  <Video className="text-gray-400" />
-                </div>
-              )}
+            {h.video?.thumbnailUrl ? (
+              <img
+                src={h.video.thumbnailUrl}
+                alt="Thumbnail do salto"
+                className="w-24 h-16 object-cover rounded border border-gray-700"
+              />
+            ) : h.video?.clipUrl ? (
+              <video
+                src={h.video.clipUrl}
+                className="w-24 h-16 object-cover rounded border border-gray-700"
+                muted
+              />
+            ) : (
+              <div className="w-24 h-16 bg-gray-700 rounded flex items-center justify-center">
+                <Video className="text-gray-400" />
+              </div>
+            )}
 
               <div>
                 <p className="text-white font-bold">
