@@ -32,6 +32,7 @@ const menuItems = [
   { id: 'trajetoria', label: 'Trajetória', icon: Calendar },
   { id: 'profile', label: 'Perfil Completo', icon: User },
   { id: 'evolucao-fisica', label: 'Evolução Física', icon: BarChart3 },
+  { id: 'cards', label: 'Cards do Atleta', icon: Image },
   { id: 'statistics', label: 'Estatísticas', icon: BarChart3 },
   { id: 'achievements', label: 'Conquistas', icon: Trophy },
   { id: 'ranking-atletas', label: 'Ranking de Atletas', icon: Crown },

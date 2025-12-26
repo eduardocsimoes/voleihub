@@ -43,7 +43,7 @@ import XPHistory from "../components/XPHistory";
 import PhysicalEvolutionMenu from "./evolucao/PhysicalEvolutionMenu";
 import AlturaAtleta from "./evolucao/AlturaAtleta";
 import SaltoAtleta from "./evolucao/SaltoAtleta";
-
+import AthleteCardsPage from "./cards/AthleteCardsPage";
 
 // 🔥 Gamificação
 import { calculateAthleteGamification } from '../gamification/gamification';
@@ -806,7 +806,7 @@ export default function DashboardAtleta() {
 
             {activeSection === 'altura' && <AlturaAtleta />}
             {activeSection === 'salto' && <SaltoAtleta />}
-            
+            {activeSection === 'cards' && <AthleteCardsPage />}
             {activeSection === 'achievements' && (<BadgesSection atletaProfile={atletaProfile ?? null} />)}
             {activeSection === 'ranking-atletas' && <RankingAtletas />}
 

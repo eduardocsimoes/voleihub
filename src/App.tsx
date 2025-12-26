@@ -9,6 +9,8 @@ import FeedPerfilAtleta from "./pages/FeedPerfilAtleta";
 import PerfilPublicoAtleta from "./pages/PerfilPublicoAtleta";
 import PhysicalEvolutionMenu from "./pages/evolucao/PhysicalEvolutionMenu";
 import AlturaAtleta from "./pages/evolucao/AlturaAtleta";
+import AthleteCardsPage from "./pages/cards/AthleteCardsPage";
+
 
 import {
   SeguidoresAtletaPage,
@@ -27,6 +29,8 @@ export default function App() {
           
           {/* Dashboard */}
           <Route path="/dashboard" element={<DashboardRouter />} />
+
+          <Route path="/cards" element={<AthleteCardsPage />} />
           
           {/* Rota pública do atleta */}
           <Route path="/perfil/:id" element={<PublicAthleteProfile />} />
@@ -36,6 +40,9 @@ export default function App() {
           {/* 🔵 ROTAS DO FEED */}
           <Route path="/feed" element={<FeedAtletas />} />
           <Route path="/feed/perfil/:uid" element={<FeedPerfilAtleta />} />
+          {/* 🟣 CARDS DO ATLETA */}
+          <Route path="/cards" element={<AthleteCardsPage />} />
+
 
           {/* Perfil público */}
           <Route path="/perfil/:id" element={<PerfilPublicoAtleta />} />
