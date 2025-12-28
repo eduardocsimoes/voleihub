@@ -976,3 +976,16 @@ export async function addXPHistory(
     updatedAt: Timestamp.now(),
   });
 }
+
+export async function updateAthleteCardImage(
+  uid: string,
+  format: "feed" | "story",
+  imageUrl: string | null
+) {
+  const ref = doc(db, "users", uid);
+
+  await updateDoc(ref, {
+    [`athleteCards.${format}ImageUrl`]: imageUrl,
+  });
+}
+

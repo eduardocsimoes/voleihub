@@ -181,3 +181,50 @@ export async function uploadJumpThumbnailToStorage(
 
   return getDownloadURL(thumbRef);
 }
+
+/* =========================================================
+   📸 ATHLETE STORIES (CARDS / STORIES)
+========================================================= */
+
+export async function uploadAthleteStoryImage(
+  userId: string,
+  imageBlob: Blob
+): Promise<{ url: string; path: string }> {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+
+  const path = `athletes/${userId}/stories/presentation/story_${timestamp}.png`;
+
+  const storyRef = ref(storage, path);
+
+  await uploadBytes(storyRef, imageBlob, {
+    contentType: "image/png",
+  });
+
+  const url = await getDownloadURL(storyRef);
+
+  return { url, path };
+}
+
+export async function uploadAthleteCardImage(
+  userId: string,
+  format: "feed" | "story",
+  file: Blob
+): Promise<{ success: boolean; url?: string }> {
+  try {
+    const fileRef = ref(
+      storage,
+      `athlete-cards/${userId}/${format}.jpg`
+    );
+
+    await uploadBytes(fileRef, file, {
+      contentType: "image/jpeg",
+    });
+
+    const url = await getDownloadURL(fileRef);
+
+    return { success: true, url };
+  } catch (error) {
+    console.error("Erro ao subir imagem do card:", error);
+    return { success: false };
+  }
+}
