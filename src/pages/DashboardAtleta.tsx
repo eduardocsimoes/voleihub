@@ -3,6 +3,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { AtletaProfile, CareerExperience, Achievement } from '../firebase/firestore';
 import PerfilCompletoAtleta from "./PerfilCompletoAtleta";
 import { auth } from "../firebase/config";
+import AdicionarConquistaPadronizada 
+from "./cards/components/AdicionarConquistaPadronizada";
+
 import { 
   getUserProfile, 
   updateAtletaProfile,
@@ -854,16 +857,19 @@ export default function DashboardAtleta() {
           editData={editData as CareerExperience | null} 
         />
       )}
+
       {modalAberto === 'achievement' && (
-        <AdicionarCarreira 
-          isOpen={true} 
-          onClose={() => { setModalAberto(null); setEditData(null); }} 
-          onSave={handleSaveAchievement} 
-          type="achievement" 
-          registeredClubs={registeredClubs} 
-          editData={editData as Achievement | null} 
+        <AdicionarConquistaPadronizada
+          isOpen={true}
+          editData={editData as Achievement | null}
+          onClose={() => {
+            setModalAberto(null);
+            setEditData(null);
+          }}
+          onSave={handleSaveAchievement}
         />
       )}
+
       {modalAberto === 'editProfile' && atletaProfile && (
         <EditarPerfilModal 
           isOpen={true} 

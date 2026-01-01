@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Building2, Trophy, Calendar, MapPin } from 'lucide-react';
 import type { CareerExperience, Achievement } from '../firebase/firestore';
 
+
 interface AdicionarExperienciaProps {
   isOpen: boolean;
   onClose: () => void;
