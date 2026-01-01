@@ -15,3 +15,22 @@ body {
   width: 100%;
   min-height: 100vh;
 }
+
+/* ===============================
+   SELECT DARK THEME (GLOBAL)
+================================ */
+
+select {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+select option {
+  background-color: #0f172a; /* slate-900 */
+  color: #ffffff;
+}
+
+select option:checked,
+select option:hover {
+  background-color: #f59e0b; /* amarelo */
+  color: #000000;
+}
