@@ -861,12 +861,12 @@ export default function DashboardAtleta() {
       {modalAberto === 'achievement' && (
         <AdicionarConquistaPadronizada
           isOpen={true}
-          editData={editData as Achievement | null}
           onClose={() => {
             setModalAberto(null);
             setEditData(null);
           }}
           onSave={handleSaveAchievement}
+          registeredClubs={registeredClubs}
         />
       )}
 

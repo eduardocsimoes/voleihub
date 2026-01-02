@@ -3,7 +3,7 @@ import { X, Trophy, Award } from "lucide-react";
 import type { Achievement } from "../../../firebase/firestore";
 
 /* =====================================================
-   CONSTANTES FIXAS
+   CONSTANTES
 ===================================================== */
 
 type ChampionshipType =
@@ -30,7 +30,8 @@ const CATEGORIES = [
   "Sub-20",
   "Sub-21",
   "Sub-23",
-  "Profissional",
+  "Adulto-Amador",
+  "Adulto-Profissional",
 ] as const;
 
 type ChampionshipCategory = typeof CATEGORIES[number];
@@ -62,17 +63,19 @@ interface Props {
     state?: string;
     city?: string;
   }) => void;
+  registeredClubs: string[];
   editData?: Achievement | null;
 }
 
 /* =====================================================
-   COMPONENT
+   COMPONENTE
 ===================================================== */
 
 export default function AdicionarConquistaPadronizada({
   isOpen,
   onClose,
   onSave,
+  registeredClubs,
 }: Props) {
 
   /* ---------------- TIPO ---------------- */
@@ -118,6 +121,7 @@ export default function AdicionarConquistaPadronizada({
   /* =====================================================
      SUBMIT
   ===================================================== */
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -126,8 +130,7 @@ export default function AdicionarConquistaPadronizada({
         ? customChampionship
         : selectedChampionship?.name;
 
-    if (!championshipName || !finalChampionshipType) return;
-    if (!category) return;
+    if (!championshipName || !finalChampionshipType || !category) return;
 
     if (achievementType === "Coletivo" && !placement) return;
     if (achievementType === "Individual" && !award.trim()) return;
@@ -142,6 +145,7 @@ export default function AdicionarConquistaPadronizada({
       id: `achievement_${Date.now()}`,
       type: achievementType,
       championship: championshipName,
+      championshipCategory: category,
       year,
       club,
 
@@ -151,7 +155,6 @@ export default function AdicionarConquistaPadronizada({
       championshipId:
         championshipId === "outro" ? undefined : championshipId,
       championshipType: finalChampionshipType,
-      championshipCategory: category,
 
       state:
         finalChampionshipType === "Estadual" ||
@@ -170,6 +173,7 @@ export default function AdicionarConquistaPadronizada({
   /* =====================================================
      RENDER
   ===================================================== */
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
       <div className="w-full max-w-xl bg-gradient-to-br from-gray-900 via-gray-800 to-black rounded-3xl border border-white/10 shadow-2xl">
@@ -250,24 +254,30 @@ export default function AdicionarConquistaPadronizada({
             ))}
           </select>
 
-          {/* RESTANTE DO FORM */}
-          {/* (mantido exatamente como estava) */}
-
+          {/* ANO */}
           <input
             type="number"
+            min="1950"
+            max={new Date().getFullYear()}
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
             className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white"
           />
 
-          <input
+          {/* CLUBE / SELEÇÃO */}
+          <select
             value={club}
             onChange={(e) => setClub(e.target.value)}
-            placeholder="Clube / Seleção"
             className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white"
             required
-          />
+          >
+            <option value="">Selecione o Clube / Seleção</option>
+            {registeredClubs.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
 
+          {/* COLETIVO */}
           {achievementType === "Coletivo" && (
             <select
               value={placement}
@@ -281,6 +291,7 @@ export default function AdicionarConquistaPadronizada({
             </select>
           )}
 
+          {/* INDIVIDUAL */}
           {achievementType === "Individual" && (
             <input
               value={award}
@@ -291,6 +302,7 @@ export default function AdicionarConquistaPadronizada({
             />
           )}
 
+          {/* ACTIONS */}
           <div className="flex gap-3 pt-4">
             <button
               type="button"
