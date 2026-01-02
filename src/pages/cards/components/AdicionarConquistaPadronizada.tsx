@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { X, Trophy, Award } from "lucide-react";
 import type { Achievement } from "../../../firebase/firestore";
 
@@ -37,10 +37,19 @@ const CATEGORIES = [
 type ChampionshipCategory = typeof CATEGORIES[number];
 
 const CHAMPIONSHIPS: ChampionshipOption[] = [
-  { id: "cbs", name: "Campeonato Brasileiro de Seleções", type: "Nacional" },
-  { id: "superliga", name: "Superliga Brasileira", type: "Nacional" },
   { id: "estadual", name: "Campeonato Estadual", type: "Estadual" },
   { id: "municipal", name: "Campeonato Municipal", type: "Municipal" },
+  { id: "cbs", name: "Campeonato Brasileiro de Seleções", type: "Nacional" },
+  { id: "cbi", name: "Campeonato Brasileiro Interclubes", type: "Nacional" },
+  { id: "jebs", name: "Jogos Escolares Brasileiros", type: "Nacional" },
+  { id: "taca_parana", name: "Taça Paraná de Voleibol", type: "Nacional" },
+  { id: "copa_minas", name: "Copa Minas de Voleibol", type: "Nacional" },
+  { id: "superliga_a", name: "Superliga A", type: "Nacional" },
+  { id: "superliga_b", name: "Superliga B", type: "Nacional" },
+  { id: "superliga_c", name: "Superliga C", type: "Nacional" },
+  { id: "sul_americano_selecoes", name: "Campeonato Sul-Americano de Seleções", type: "Internacional" },
+  { id: "pan_americano_selecoes", name: "Copa Pan-Americana de Seleções", type: "Internacional" },
+  { id: "mundial_selecoes", name: "Campeonato Mundial de Seleções", type: "Internacional" },
 ];
 
 const STATES = [
@@ -56,6 +65,7 @@ const STATES = [
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  registeredClubs: string[];
   onSave: (achievement: Achievement & {
     championshipId?: string;
     championshipType?: ChampionshipType;
@@ -63,8 +73,6 @@ interface Props {
     state?: string;
     city?: string;
   }) => void;
-  registeredClubs: string[];
-  editData?: Achievement | null;
 }
 
 /* =====================================================
@@ -84,7 +92,6 @@ export default function AdicionarConquistaPadronizada({
 
   /* ---------------- CAMPEONATO ---------------- */
   const [championshipId, setChampionshipId] = useState("");
-  const [customChampionship, setCustomChampionship] = useState("");
   const [championshipType, setChampionshipType] =
     useState<ChampionshipType | "">("");
 
@@ -101,20 +108,7 @@ export default function AdicionarConquistaPadronizada({
   const [state, setState] = useState("");
   const [city, setCity] = useState("");
 
-  const selectedChampionship = CHAMPIONSHIPS.find(
-    (c) => c.id === championshipId
-  );
-
-  const finalChampionshipType =
-    championshipId === "outro"
-      ? championshipType
-      : selectedChampionship?.type;
-
-  useEffect(() => {
-    if (selectedChampionship) {
-      setChampionshipType(selectedChampionship.type);
-    }
-  }, [selectedChampionship]);
+  const finalChampionshipType = championshipType;
 
   if (!isOpen) return null;
 
@@ -125,12 +119,8 @@ export default function AdicionarConquistaPadronizada({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    const championshipName =
-      championshipId === "outro"
-        ? customChampionship
-        : selectedChampionship?.name;
-
-    if (!championshipName || !finalChampionshipType || !category) return;
+    const selected = CHAMPIONSHIPS.find(c => c.id === championshipId);
+    if (!selected || !finalChampionshipType || !category) return;
 
     if (achievementType === "Coletivo" && !placement) return;
     if (achievementType === "Individual" && !award.trim()) return;
@@ -144,26 +134,23 @@ export default function AdicionarConquistaPadronizada({
     } = {
       id: `achievement_${Date.now()}`,
       type: achievementType,
-      championship: championshipName,
+      championship: selected.name,
+      championshipId: selected.id,
+      championshipType: finalChampionshipType,
       championshipCategory: category,
       year,
       club,
-
       placement: achievementType === "Coletivo" ? placement : undefined,
       award: achievementType === "Individual" ? award : undefined,
-
-      championshipId:
-        championshipId === "outro" ? undefined : championshipId,
-      championshipType: finalChampionshipType,
-
       state:
         finalChampionshipType === "Estadual" ||
         finalChampionshipType === "Municipal"
           ? state
           : undefined,
-
       city:
-        finalChampionshipType === "Municipal" ? city : undefined,
+        finalChampionshipType === "Municipal"
+          ? city
+          : undefined,
     };
 
     onSave(achievement);
@@ -201,7 +188,7 @@ export default function AdicionarConquistaPadronizada({
             <button
               type="button"
               onClick={() => setAchievementType("Coletivo")}
-              className={`p-4 rounded-xl border transition-all ${
+              className={`p-4 rounded-xl border ${
                 achievementType === "Coletivo"
                   ? "bg-yellow-500/20 border-yellow-500 text-yellow-400"
                   : "bg-white/5 border-white/10 text-gray-400"
@@ -214,7 +201,7 @@ export default function AdicionarConquistaPadronizada({
             <button
               type="button"
               onClick={() => setAchievementType("Individual")}
-              className={`p-4 rounded-xl border transition-all ${
+              className={`p-4 rounded-xl border ${
                 achievementType === "Individual"
                   ? "bg-purple-500/20 border-purple-500 text-purple-400"
                   : "bg-white/5 border-white/10 text-gray-400"
@@ -228,31 +215,64 @@ export default function AdicionarConquistaPadronizada({
           {/* CAMPEONATO */}
           <select
             value={championshipId}
-            onChange={(e) => setChampionshipId(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value;
+              setChampionshipId(value);
+
+              const found = CHAMPIONSHIPS.find(c => c.id === value);
+              setChampionshipType(found ? found.type : "");
+
+              setState("");
+              setCity("");
+            }}
             className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white"
             required
           >
             <option value="">Selecione o campeonato</option>
-            {CHAMPIONSHIPS.map((c) => (
+            {CHAMPIONSHIPS.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
-            <option value="outro">Outro</option>
           </select>
 
           {/* CATEGORIA */}
           <select
             value={category}
-            onChange={(e) =>
-              setCategory(e.target.value as ChampionshipCategory)
-            }
+            onChange={(e) => setCategory(e.target.value as ChampionshipCategory)}
             className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white"
             required
           >
             <option value="">Categoria</option>
-            {CATEGORIES.map((cat) => (
+            {CATEGORIES.map(cat => (
               <option key={cat} value={cat}>{cat}</option>
             ))}
           </select>
+
+          {/* ESTADO */}
+          {(finalChampionshipType === "Estadual" ||
+            finalChampionshipType === "Municipal") && (
+            <select
+              value={state}
+              onChange={(e) => setState(e.target.value)}
+              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white"
+              required
+            >
+              <option value="">Estado</option>
+              {STATES.map(uf => (
+                <option key={uf} value={uf}>{uf}</option>
+              ))}
+            </select>
+          )}
+
+          {/* CIDADE */}
+          {finalChampionshipType === "Municipal" && (
+            <input
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="Município"
+              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white"
+              required
+            />
+          )}
 
           {/* ANO */}
           <input
@@ -264,7 +284,7 @@ export default function AdicionarConquistaPadronizada({
             className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white"
           />
 
-          {/* CLUBE / SELEÇÃO */}
+          {/* CLUBE */}
           <select
             value={club}
             onChange={(e) => setClub(e.target.value)}
@@ -272,7 +292,7 @@ export default function AdicionarConquistaPadronizada({
             required
           >
             <option value="">Selecione o Clube / Seleção</option>
-            {registeredClubs.map((c) => (
+            {registeredClubs.map(c => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
