@@ -95,6 +95,53 @@ const STATES = [
   "TO",
 ];
 
+const DIVISIONS = [
+  "Divisão Única",
+  "Divisão Especial",
+  "1ª Divisão",
+  "2ª Divisão",
+  "3ª Divisão",
+  "A",
+  "B",
+  "C",
+  "Ouro",
+  "Prata",
+  "Bronze",
+] as const;
+
+type Division = (typeof DIVISIONS)[number];
+
+const CHAMPIONSHIP_DIVISIONS: Record<string, readonly Division[]> = {
+  // Campeonato Brasileiro de Seleções
+  cbs: ["Divisão Especial", "1ª Divisão", "2ª Divisão"],
+
+  // Campeonato Brasileiro Interclubes
+  cbi: ["1ª Divisão", "2ª Divisão"],
+
+  // Superliga
+  superliga: ["A", "B", "C"],
+
+  // Campeonato Estadual de São Paulo
+  estadual_SP: ["Ouro", "Prata", "Bronze"],
+};
+
+function getChampionshipContextKey(
+  championshipId: string,
+  championshipType: ChampionshipType,
+  state?: string,
+  city?: string
+) {
+  if (championshipType === "Municipal" && state && city) {
+    return `${championshipId}_${city}_${state}`;
+  }
+
+  if (championshipType === "Estadual" && state) {
+    return `${championshipId}_${state}`;
+  }
+
+  return championshipId;
+}
+
 /* =====================================================
    PROPS
 ===================================================== */
@@ -111,6 +158,7 @@ interface Props {
       championshipCategory?: ChampionshipCategory;
       state?: string;
       city?: string;
+      division?: Division;
     }
   ) => void;
 }
@@ -153,6 +201,34 @@ export default function AdicionarConquistaPadronizada({
 
   const finalChampionshipType = championshipType;
 
+  const [division, setDivision] = useState<Division | "">("");
+
+  const contextKey =
+  championshipId && championshipType
+    ? getChampionshipContextKey(
+        championshipId,
+        championshipType,
+        championshipType === "Estadual" || championshipType === "Municipal"
+          ? state
+          : undefined,
+        championshipType === "Municipal" ? city : undefined
+      )
+    : "";
+
+  const divisionOptions: readonly Division[] =
+    contextKey && CHAMPIONSHIP_DIVISIONS[contextKey]
+      ? CHAMPIONSHIP_DIVISIONS[contextKey]
+      : ["Divisão Única"];
+
+  const canSelectDivision =
+  championshipId &&
+  championshipType &&
+  (championshipType === "Nacional" ||
+    championshipType === "Internacional" ||
+    (championshipType === "Estadual" && state) ||
+    (championshipType === "Municipal" && state && city));
+    
+
   /* =====================================================
      EDIÇÃO: PRÉ-CARREGAR DADOS
   ===================================================== */
@@ -173,6 +249,8 @@ export default function AdicionarConquistaPadronizada({
     // Estado / Cidade
     setState(editData.state ?? "");
     setCity(editData.city ?? "");
+
+    setDivision((editData as any).division ?? "");
 
     // Colocação / Prêmio
     setPlacement(((editData as any).placement as any) ?? "1º Lugar");
@@ -240,6 +318,7 @@ export default function AdicionarConquistaPadronizada({
       championshipCategory?: ChampionshipCategory;
       state?: string;
       city?: string;
+      division?: Division;
     } = {
       // ✅ mantém o mesmo ID quando está editando
       id: editData?.id ?? `achievement_${Date.now()}`,
@@ -250,6 +329,8 @@ export default function AdicionarConquistaPadronizada({
 
       championshipType: finalChampionshipType as ChampionshipType,
       championshipCategory: category as ChampionshipCategory,
+
+      division: division || undefined,
 
       year,
       club,
@@ -438,6 +519,22 @@ export default function AdicionarConquistaPadronizada({
             />
           )}
 
+          {canSelectDivision && (
+            <select
+              value={division}
+              onChange={(e) => setDivision(e.target.value as Division)}
+              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white"
+              required
+            >
+              <option value="">Divisão</option>
+              {divisionOptions.map((div) => (
+                <option key={div} value={div}>
+                  {div}
+                </option>
+              ))}
+            </select>
+          )}
+          
           {/* ANO */}
           <input
             type="number"
