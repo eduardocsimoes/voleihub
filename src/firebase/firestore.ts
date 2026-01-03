@@ -58,12 +58,24 @@ export interface CareerExperience {
 export interface Achievement {
   id: string;
   type: 'Coletivo' | 'Individual';
+
   championship: string;
+  championshipId?: string;
+
+  championshipType?: 'Municipal' | 'Estadual' | 'Nacional' | 'Internacional';
+  championshipCategory?: string;
+
   club: string;
   year: number;
+
   placement?: '1º Lugar' | '2º Lugar' | '3º Lugar' | 'Participante';
   award?: string;
+
+  // ✅ CAMPOS QUE ESTAVAM FALTANDO
+  state?: string;
+  city?: string;
 }
+
 
 // ⭐⭐⭐ Gamificação – estatísticas calculadas dinamicamente ⭐⭐⭐
 export interface GamificationStats {

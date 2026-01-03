@@ -867,6 +867,7 @@ export default function DashboardAtleta() {
           }}
           onSave={handleSaveAchievement}
           registeredClubs={registeredClubs}
+          editData={editData as Achievement | null}
         />
       )}
 
