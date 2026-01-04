@@ -234,52 +234,79 @@ export default function AdicionarConquistaPadronizada({
   ===================================================== */
   useEffect(() => {
     if (!isOpen) return;
-    if (!editData) return;
-
-    // Tipo
-    setAchievementType(editData.type === "Individual" ? "Individual" : "Coletivo");
-
-    // Ano / Clube
-    if (typeof editData.year === "number") setYear(editData.year);
-    setClub(editData.club ?? "");
-
-    // Categoria
-    setCategory((editData as any).championshipCategory ?? "");
-
-    // Estado / Cidade
-    setState(editData.state ?? "");
-    setCity(editData.city ?? "");
-
-    setDivision((editData as any).division ?? "");
-
-    // Colocação / Prêmio
-    setPlacement(((editData as any).placement as any) ?? "1º Lugar");
-    setAward(editData.award ?? "");
-
-    // Campeonato
-    const hasChampionshipId = !!(editData as any).championshipId;
-    const champId = (editData as any).championshipId as string | undefined;
-    const champName = editData.championship;
-
-    // tenta casar por id+nome -> por nome -> por id
-    const match =
-      (hasChampionshipId
-        ? CHAMPIONSHIPS.find((c) => c.id === champId && c.name === champName)
-        : undefined) ||
-      CHAMPIONSHIPS.find((c) => c.name === champName) ||
-      (hasChampionshipId ? CHAMPIONSHIPS.find((c) => c.id === champId) : undefined);
-
-    if (match) {
-      setChampionshipId(match.id);
-      setChampionshipType(match.type);
-      setCustomChampionship("");
-    } else {
-      setChampionshipId("outro");
-      setCustomChampionship(champName ?? "");
-      setChampionshipType(((editData as any).championshipType as ChampionshipType) ?? "");
+  
+    /* =====================================================
+       MODO EDIÇÃO
+    ===================================================== */
+    if (editData) {
+      // Tipo
+      setAchievementType(editData.type === "Individual" ? "Individual" : "Coletivo");
+  
+      // Ano / Clube
+      if (typeof editData.year === "number") setYear(editData.year);
+      setClub(editData.club ?? "");
+  
+      // Categoria
+      setCategory((editData as any).championshipCategory ?? "");
+  
+      // Estado / Cidade
+      setState(editData.state ?? "");
+      setCity(editData.city ?? "");
+  
+      // Divisão (se existir)
+      setDivision((editData as any).division ?? "");
+  
+      // Colocação / Prêmio
+      setPlacement(((editData as any).placement as any) ?? "1º Lugar");
+      setAward(editData.award ?? "");
+  
+      // Campeonato
+      const hasChampionshipId = !!(editData as any).championshipId;
+      const champId = (editData as any).championshipId as string | undefined;
+      const champName = editData.championship;
+  
+      const match =
+        (hasChampionshipId
+          ? CHAMPIONSHIPS.find((c) => c.id === champId && c.name === champName)
+          : undefined) ||
+        CHAMPIONSHIPS.find((c) => c.name === champName) ||
+        (hasChampionshipId ? CHAMPIONSHIPS.find((c) => c.id === champId) : undefined);
+  
+      if (match) {
+        setChampionshipId(match.id);
+        setChampionshipType(match.type);
+        setCustomChampionship("");
+      } else {
+        setChampionshipId("outro");
+        setCustomChampionship(champName ?? "");
+        setChampionshipType(
+          ((editData as any).championshipType as ChampionshipType) ?? ""
+        );
+      }
+  
+      return;
     }
-  }, [isOpen, editData]);
-
+  
+    /* =====================================================
+       MODO CRIAÇÃO (NOVO)
+       → auto-seleciona Divisão Única quando aplicável
+    ===================================================== */
+  
+    if (!canSelectDivision) {
+      setDivision("");
+      return;
+    }
+  
+    if (divisionOptions.length === 1) {
+      setDivision(divisionOptions[0]);
+    }
+  }, [
+    isOpen,
+    editData,
+    canSelectDivision,
+    divisionOptions,
+  ]);
+  
   if (!isOpen) return null;
 
   /* =====================================================

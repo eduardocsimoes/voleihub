@@ -246,7 +246,28 @@ export default function DashboardAtleta() {
   const isProfileEmpty = totalClubes === 0 && totalCompeticoes === 0;
   const registeredClubs = atletaProfile?.experiences?.map(exp => exp.clubName) || [];
 
-
+  const formatAchievementDetails = (ach: Achievement) => {
+    const parts: string[] = [];
+  
+    if ((ach as any).championshipCategory) {
+      parts.push((ach as any).championshipCategory);
+    }
+  
+    if ((ach as any).division && (ach as any).division !== "Divisão Única") {
+      parts.push((ach as any).division);
+    }
+  
+    if (ach.state) {
+      parts.push(ach.state);
+    }
+  
+    if (ach.city) {
+      parts.push(ach.city);
+    }
+  
+    return parts.join(" • ");
+  };
+   
   const principaisConquistas = (atletaProfile?.achievements || [])
     .filter((ach) => 
       (ach.placement && ach.placement !== 'Participante') ||
@@ -583,8 +604,16 @@ export default function DashboardAtleta() {
                                               <div className="text-white font-medium text-sm break-words">
                                                 {ach.championship}
                                               </div>
-                                              <div className="text-yellow-400 text-xs">
-                                                {ach.year} • {ach.placement || ach.award}
+                                              <div className="text-yellow-400 text-xs space-y-0.5">
+                                                <div>
+                                                  {ach.year} • {ach.placement || ach.award}
+                                                </div>
+
+                                                {formatAchievementDetails(ach) && (
+                                                  <div className="text-gray-300 text-[11px]">
+                                                    {formatAchievementDetails(ach)}
+                                                  </div>
+                                                )}
                                               </div>
                                             </div>
                                           </div>
@@ -656,9 +685,16 @@ export default function DashboardAtleta() {
                                       {ach.championship}
                                     </h3>
 
-                                    <p className="text-gray-400 text-xs mb-1 truncate">
-                                      {ach.club} • {ach.year}
+                                    <p className="text-gray-400 text-xs mb-1">
+                                      {ach.year}
                                     </p>
+
+                                    {formatAchievementDetails(ach) && (
+                                      <p className="text-gray-500 text-[11px] leading-tight">
+                                        {formatAchievementDetails(ach)}
+                                      </p>
+                                    )}
+
                                   </div>
                                 </div>
 

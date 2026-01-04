@@ -2,6 +2,28 @@ import React, { useState } from 'react';
 import { Building2, Trophy, Calendar, Edit2, Trash2 } from 'lucide-react';
 import type { CareerExperience, Achievement } from '../firebase/firestore';
 
+const formatAchievementDetails = (ach: Achievement) => {
+  const parts: string[] = [];
+
+  if ((ach as any).championshipCategory) {
+    parts.push((ach as any).championshipCategory);
+  }
+
+  if ((ach as any).division && (ach as any).division !== "Divisão Única") {
+    parts.push((ach as any).division);
+  }
+
+  if (ach.state) {
+    parts.push(ach.state);
+  }
+
+  if (ach.city) {
+    parts.push(ach.city);
+  }
+
+  return parts.join(" • ");
+};
+
 interface TimelineHorizontalProps {
   experiences: CareerExperience[];
   achievements: Achievement[];
@@ -281,6 +303,12 @@ export default function TimelineHorizontal({
                         {achievement.award && (
                           <div className="text-purple-300 font-semibold text-xs mb-1">
                             ⭐ {achievement.award}
+                          </div>
+                        )}
+
+                        {formatAchievementDetails(achievement) && (
+                          <div className="text-gray-300 text-[11px] leading-snug mb-1">
+                            {formatAchievementDetails(achievement)}
                           </div>
                         )}
                         

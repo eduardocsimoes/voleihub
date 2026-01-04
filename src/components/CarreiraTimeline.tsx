@@ -214,11 +214,13 @@ export default function CarreiraTimeline({
           isOpen={true}
           onClose={handleCloseModal}
           onSave={handleSaveAchievement}
+          registeredClubs={experiences.map(e => e.clubName)}
         />
       )}
 
+
       {/* EDITAR TÍTULO (LEGADO) */}
-      {modalAberto === 'achievement' && editData && (
+      {/*{modalAberto === 'achievement' && editData && (
         <AdicionarCarreira
           isOpen={true}
           onClose={handleCloseModal}
@@ -227,7 +229,7 @@ export default function CarreiraTimeline({
           editData={editData as Achievement}
           registeredClubs={experiences.map(e => e.clubName)}
         />
-      )}
+      )}*/}
 
     </div>
   );

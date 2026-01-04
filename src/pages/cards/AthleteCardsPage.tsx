@@ -2,6 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { auth } from "../../firebase/config";
 import { getUserProfile } from "../../firebase/firestore";
 import { uploadAthleteCardImage } from "../../firebase/storage";
+import {
+  buildAchievementCardProfile,
+  type AchievementVM,
+} from "./achievementCardProfile";
+
 
 import AthletePresentationStoryCard from "../cards/AthletePresentationStoryCard";
 import AthletePresentationFeedCard from "../cards/AthletePresentationFeedCard";
@@ -104,13 +109,13 @@ export default function AthleteCardsPage() {
     return profile?.clubName || profile?.club || "—";
   }, [profile]);
 
-  const achievements = useMemo<any[]>(() => {
+  const achievements = useMemo<AchievementVM[]>(() => {
     return Array.isArray(profile?.achievements)
-      ? profile.achievements
+      ? (profile.achievements as AchievementVM[])
       : [];
   }, [profile]);
 
-  const selectedAchievement = useMemo(() => {
+  const selectedAchievement = useMemo<AchievementVM | null>(() => {
     if (!achievements.length) return null;
     return achievements[selectedAchievementIndex] ?? null;
   }, [achievements, selectedAchievementIndex]);
@@ -122,37 +127,50 @@ export default function AthleteCardsPage() {
     if (!selectedAchievement) return null;
 
     const rawYear =
-      selectedAchievement.year ||
-      selectedAchievement.season ||
-      (selectedAchievement.date
-        ? new Date(selectedAchievement.date).getFullYear()
-        : null);
+    selectedAchievement.year ??
+    selectedAchievement.season ??
+    (selectedAchievement.date
+      ? new Date(selectedAchievement.date).getFullYear()
+      : null);
+  
 
     return {
       title: safeText(
-        selectedAchievement.title ||
-          selectedAchievement.championship ||
-          "Conquista"
-      ),
+        selectedAchievement.title ??
+        selectedAchievement.championship ??
+        "Conquista"
+      ),      
       achievement: safeText(
-        selectedAchievement.achievement ||
-          selectedAchievement.description ||
-          selectedAchievement.championship
-      ),
+        selectedAchievement.achievement ??
+        selectedAchievement.description ??
+        selectedAchievement.championship ??
+        "—"
+      ),      
       category: safeText(
-        selectedAchievement.category ||
-          selectedAchievement.level ||
-          selectedAchievement.type
-      ),
+        selectedAchievement.category ??
+        selectedAchievement.level ??
+        selectedAchievement.type ??
+        "—"
+      ),      
       year: Number(rawYear) || new Date().getFullYear(), // ✅ garante number
       club: safeText(
-        selectedAchievement.club ||
-          selectedAchievement.clubName ||
-          club
-      ),
+        selectedAchievement.club ??
+        selectedAchievement.clubName ??
+        club
+      ),      
     };
   }, [selectedAchievement, club]);
 
+  const achievementProfile = useMemo(() => {
+    if (!selectedAchievement) return null;
+  
+    return buildAchievementCardProfile({
+      achievement: selectedAchievement,
+      allAchievements: achievements,
+      // futuramente: divisionOrder (quando vier do cadastro)
+    });
+  }, [selectedAchievement, achievements]);  
+  
   /* =========================
      EXPORT
   ========================== */
@@ -300,6 +318,7 @@ export default function AthleteCardsPage() {
                 athleteName={profile.name}
                 profilePhotoUrl={profile.photoURL}
                 {...achievementCardData}
+                profile={achievementProfile ?? undefined}
                 brandText="voleihub.com"
               />
             ) : (
@@ -307,6 +326,7 @@ export default function AthleteCardsPage() {
                 athleteName={profile.name}
                 profilePhotoUrl={profile.photoURL}
                 {...achievementCardData}
+                profile={achievementProfile ?? undefined}
                 brandText="voleihub.com"
               />
             )
