@@ -1,7 +1,8 @@
 // src/pages/cards/AthleteAchievementFeedCard.tsx
-import AchievementCardBase, {
-  CardStyleTokens,
-} from "../cards/base/AchievementCardBase";
+
+import AchievementCardBase from "../cards/base/AchievementCardBase";
+import type { CardStyleTokens as ProfileTokens } from "./achievementCardProfile";
+import type { AchievementCardUI } from "./design/achievementCardVisuals";
 
 type Props = {
   athleteName: string;
@@ -12,16 +13,37 @@ type Props = {
   year: number;
   club: string;
   brandText?: string;
-  profile?: CardStyleTokens;
+
+  profile?: ProfileTokens;
+  ui?: AchievementCardUI;
 };
 
 export default function AthleteAchievementFeedCard(props: Props) {
   return (
     <AchievementCardBase
       {...props}
-      aspectClass="w-[420px] aspect-square"
-      photoHeightClass="h-[40%]"
-      containerPadding="px-6 pb-6 pt-4 h-[60%]"
+
+      /* =========================
+         SIZE — ~10% menor + responsivo
+      ========================== */
+
+      aspectClass="
+        w-[380px]
+        sm:w-[360px]
+        md:w-[380px]
+        lg:w-[400px]
+        aspect-square
+      "
+
+      /* =========================
+         PHOTO — ligeiramente menor
+      ========================== */
+      photoHeightClass="h-[38%]"
+
+      /* =========================
+         CONTENT — mais compacto
+      ========================== */
+      containerPadding="px-5 pb-5 pt-3 h-[62%]"
     />
   );
 }

@@ -1,36 +1,25 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { RotateCcw, ImagePlus, Trophy, Star } from "lucide-react";
+import type { CardStyleTokens as ProfileTokens } from "../achievementCardProfile";
+import type { AchievementCardUI, PlacementType } from "../design/achievementCardVisuals";
 
 /* =========================
    TYPES
 ========================== */
 
-export type CardStyleTokens = {
-  baseTheme: "international" | "national" | "state" | "municipal";
-  frameClass: string;
-  glowClass: string;
-  iconBgClass: string;
-  textAccentClass: string;
-
-  // ✅ raridade usada para animações
-  rarity?: "common" | "rare" | "epic" | "legendary";
-
-  dominance?: {
-    isDominant: boolean;
-    label: string | null;
-  };
-};
-
 type BaseProps = {
   athleteName: string;
   profilePhotoUrl?: string | null;
+
   title: string;
   achievement: string;
   category?: string | null;
   year: number;
   club: string;
   brandText?: string;
-  profile?: CardStyleTokens;
+
+  profile?: ProfileTokens;
+  ui?: AchievementCardUI;
 
   aspectClass: string;
   photoHeightClass: string;
@@ -41,86 +30,37 @@ type BaseProps = {
    HELPERS
 ========================== */
 
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
-
-function getTiltIntensity(rarity?: CardStyleTokens["rarity"]) {
-  switch (rarity) {
-    case "legendary":
-      return 18;
-    case "epic":
-      return 12;
-    case "rare":
-      return 8;
+function placementLabel(p: PlacementType) {
+  switch (p) {
+    case "gold":
+      return "1º Lugar";
+    case "silver":
+      return "2º Lugar";
+    case "bronze":
+      return "3º Lugar";
+    case "mvp":
+      return "MVP";
+    case "position":
+      return "Melhor da Posição";
     default:
-      return 4;
+      return null;
   }
 }
 
-function getHoverScale(rarity?: CardStyleTokens["rarity"]) {
-  switch (rarity) {
-    case "legendary":
-      return 1.06;
-    case "epic":
-      return 1.045;
-    case "rare":
-      return 1.03;
+function placementBadgeStyle(p: PlacementType) {
+  switch (p) {
+    case "gold":
+      return "bg-yellow-400 text-black";
+    case "silver":
+      return "bg-gray-200 text-black";
+    case "bronze":
+      return "bg-amber-600 text-black";
+    case "mvp":
+      return "bg-orange-500 text-white";
+    case "position":
+      return "bg-purple-600 text-white";
     default:
-      return 1.02;
-  }
-}
-
-function getTransitionMs(rarity?: CardStyleTokens["rarity"]) {
-  switch (rarity) {
-    case "legendary":
-      return 120;
-    case "epic":
-      return 140;
-    case "rare":
-      return 160;
-    default:
-      return 180;
-  }
-}
-
-function getShimmerOpacity(rarity?: CardStyleTokens["rarity"]) {
-  switch (rarity) {
-    case "legendary":
-      return 0.28;
-    case "epic":
-      return 0.22;
-    case "rare":
-      return 0.16;
-    default:
-      return 0.1;
-  }
-}
-
-function getGlareOpacity(rarity?: CardStyleTokens["rarity"]) {
-  switch (rarity) {
-    case "legendary":
-      return 0.55;
-    case "epic":
-      return 0.45;
-    case "rare":
-      return 0.35;
-    default:
-      return 0.28;
-  }
-}
-
-function getRarityHaloClass(rarity?: CardStyleTokens["rarity"]) {
-  // camada extra suave (não depende de cores fixas, só intensidade)
-  switch (rarity) {
-    case "legendary":
-      return "opacity-100";
-    case "epic":
-      return "opacity-80";
-    case "rare":
-      return "opacity-60";
-    default:
-      return "opacity-40";
+      return "bg-white/15 text-white";
   }
 }
 
@@ -138,90 +78,37 @@ export default function AchievementCardBase({
   club,
   brandText = "voleihub.com",
   profile,
+  ui,
   aspectClass,
   photoHeightClass,
   containerPadding,
 }: BaseProps) {
   const cardRef = useRef<HTMLDivElement | null>(null);
-
-  // tilt e glare
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
-  const [glare, setGlare] = useState({ x: 50, y: 35, a: 0 }); // x/y em %, a=alpha
 
-  // hover state
-  const [isHover, setIsHover] = useState(false);
-
-  // foto custom
   const [customPhoto, setCustomPhoto] = useState<string | null>(null);
   const photoToUse = customPhoto || profilePhotoUrl;
 
-  // acessibilidade
-  const [reduceMotion, setReduceMotion] = useState(false);
-
-  useEffect(() => {
-    const mq = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-    if (!mq) return;
-
-    const apply = () => setReduceMotion(!!mq.matches);
-    apply();
-
-    // compat
-    if (mq.addEventListener) {
-      mq.addEventListener("change", apply);
-      return () => mq.removeEventListener("change", apply);
-    } else {
-      // @ts-ignore
-      mq.addListener(apply);
-      // @ts-ignore
-      return () => mq.removeListener(apply);
-    }
-  }, []);
-
-  const rarity = profile?.rarity;
-
-  const intensity = useMemo(() => getTiltIntensity(rarity), [rarity]);
-  const hoverScale = useMemo(() => getHoverScale(rarity), [rarity]);
-  const transitionMs = useMemo(() => getTransitionMs(rarity), [rarity]);
-  const shimmerOpacity = useMemo(() => getShimmerOpacity(rarity), [rarity]);
-  const glareOpacity = useMemo(() => getGlareOpacity(rarity), [rarity]);
+  const tiltIntensity = ui?.tilt ?? 8;
 
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
-    if (reduceMotion) return;
     if (!cardRef.current) return;
 
     const rect = cardRef.current.getBoundingClientRect();
-    const px = e.clientX - rect.left;
-    const py = e.clientY - rect.top;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
-    const cx = rect.width / 2;
-    const cy = rect.height / 2;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
 
-    const nx = (px - cx) / cx; // -1..1
-    const ny = (py - cy) / cy; // -1..1
-
-    const rotateY = nx * intensity;
-    const rotateX = -ny * intensity;
+    const rotateY = ((x - centerX) / centerX) * tiltIntensity;
+    const rotateX = -((y - centerY) / centerY) * tiltIntensity;
 
     setTilt({ x: rotateX, y: rotateY });
-
-    // glare em percent
-    const gx = clamp((px / rect.width) * 100, 0, 100);
-    const gy = clamp((py / rect.height) * 100, 0, 100);
-
-    setGlare({ x: gx, y: gy, a: glareOpacity });
-  }
-
-  function handleMouseEnter() {
-    setIsHover(true);
-    if (!reduceMotion) {
-      setGlare((g) => ({ ...g, a: glareOpacity }));
-    }
   }
 
   function handleMouseLeave() {
-    setIsHover(false);
     setTilt({ x: 0, y: 0 });
-    setGlare({ x: 50, y: 35, a: 0 });
   }
 
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -234,166 +121,168 @@ export default function AchievementCardBase({
   }
 
   /* =========================
-     VISUAL TOKENS
+     TOKENS
   ========================== */
-  const frameClass = profile?.frameClass ?? "border-yellow-500";
-  const glowClass = profile?.glowClass ?? "shadow-xl";
-  const iconBg = profile?.iconBgClass ?? "bg-yellow-400";
-  const accentText = profile?.textAccentClass ?? "text-yellow-600";
-  const haloClass = getRarityHaloClass(rarity);
+  const frameOuter = ui?.frameOuter ?? profile?.frameClass ?? "border-yellow-500";
+  const frameInner = ui?.frameInner ?? "border-white/15";
+  const glow = ui?.glow ?? profile?.glowClass ?? "shadow-xl";
+  const accentText = ui?.accentText ?? "text-yellow-300";
+  const chip = ui?.chipClass ?? "bg-black/40 text-white border border-white/10";
+  const bgGradient = ui?.bgGradient ?? "from-[#0b0f16] via-[#1a1f2a] to-[#05070a]";
+  const bgPatternOpacity = ui?.bgPatternOpacity ?? "opacity-70";
+  const medalBg = ui?.medalBg ?? "bg-yellow-400";
+  const medalRing = ui?.medalRing ?? "ring-white/20";
 
-  // transform final (com hover scale)
-  const transformValue = reduceMotion
-    ? undefined
-    : `perspective(1200px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale(${
-        isHover ? hoverScale : 1
-      })`;
+  const dominanceLabel = profile?.dominance?.label ?? null;
+  const hasDominance = Boolean(profile?.dominance?.isDominant && dominanceLabel);
 
+  const placementText = useMemo(() => placementLabel(ui?.placement ?? "none"), [ui?.placement]);
+  const placementClass = useMemo(() => placementBadgeStyle(ui?.placement ?? "none"), [ui?.placement]);
+
+  const shimmerClass = useMemo(() => {
+    const strength = ui?.shimmerStrength ?? "low";
+    if (strength === "high") return "opacity-100";
+    if (strength === "mid") return "opacity-70";
+    return "opacity-40";
+  }, [ui?.shimmerStrength]);
+
+  /* =========================
+     RENDER
+  ========================== */
   return (
     <div
       ref={cardRef}
       onMouseMove={handleMouseMove}
-      onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      // mobile: não aplica tilt (não quebra), mantém tudo funcionando
-      onTouchStart={() => setIsHover(true)}
-      onTouchEnd={() => setIsHover(false)}
-      style={
-        reduceMotion
-          ? undefined
-          : {
-              transform: transformValue,
-              transformStyle: "preserve-3d",
-              transition: `transform ${transitionMs}ms ease-out`,
-              willChange: "transform",
-            }
-      }
-      className={`
-        relative overflow-hidden rounded-[40px]
-        bg-gradient-to-br from-[#f7f6f2] to-[#e5e3dc]
-        ${aspectClass}
-        ${glowClass}
-      `}
+      style={{
+        transform: `perspective(1200px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+        transition: "transform 140ms ease-out",
+      }}
+      className={`relative overflow-hidden ${aspectClass} rounded-[42px] ${glow} select-none`}
     >
-      {/* ================= MOLDURA ================= */}
-      <div className={`absolute inset-0 rounded-[40px] border-[3px] ${frameClass}`} />
+      {/* BACKGROUND */}
+      <div className={`absolute inset-0 bg-gradient-to-br ${bgGradient}`} />
 
-      {/* ================= RARITY HALO (leve) ================= */}
       <div
-        className={`
-          pointer-events-none absolute inset-0
-          ${haloClass}
-          transition-opacity duration-300
-        `}
+        className={`absolute inset-0 pointer-events-none ${bgPatternOpacity}`}
         style={{
-          background:
-            "radial-gradient(circle at 30% 10%, rgba(255,255,255,0.28), transparent 40%)",
-          opacity: isHover ? 1 : 0.7,
+          backgroundImage:
+            "radial-gradient(circle at 20% 15%, rgba(255,255,255,0.10), transparent 38%)," +
+            "radial-gradient(circle at 80% 30%, rgba(255,255,255,0.08), transparent 40%)," +
+            "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 45%)," +
+            "linear-gradient(45deg, rgba(255,255,255,0.05) 0%, transparent 55%)",
         }}
       />
 
-      {/* ================= GLARE (reflexo) ================= */}
-      {!reduceMotion && (
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background: `radial-gradient(circle at ${glare.x}% ${glare.y}%, rgba(255,255,255,${glare.a}), transparent 45%)`,
-            transition: `background ${transitionMs}ms ease-out`,
-            mixBlendMode: "soft-light",
-          }}
-        />
-      )}
+      {/* FRAME */}
+      <div className={`absolute inset-0 rounded-[42px] border-[3px] ${frameOuter}`} />
+      <div className={`absolute inset-[10px] rounded-[34px] border-2 ${frameInner}`} />
 
-      {/* ================= SHIMMER (rarity) ================= */}
-      {!reduceMotion && (
-        <div
-          className="pointer-events-none absolute -inset-[40%]"
-          style={{
-            opacity: isHover ? shimmerOpacity : shimmerOpacity * 0.45,
-            transform: `translateX(${isHover ? "18%" : "-8%"}) rotate(18deg)`,
-            transition: `transform 650ms ease, opacity 350ms ease`,
-            background:
-              "linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)",
-          }}
-        />
-      )}
+      {/* TOP CHIPS */}
+      <div className="absolute top-4 left-4 right-4 z-30 flex items-start justify-between gap-2">
+        <div className="flex flex-wrap gap-2">
+          {!!profile?.competitionLabel && (
+            <span className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold ${chip}`}>
+              {profile.competitionLabel}
+            </span>
+          )}
+          {!!profile?.divisionLabel && (
+            <span className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold ${chip}`}>
+              {profile.divisionLabel}
+            </span>
+          )}
+        </div>
 
-      {/* ================= DOMINÂNCIA ================= */}
-      {profile?.dominance?.isDominant && profile.dominance.label && (
-        <div className="absolute top-5 left-5 z-30 bg-black/80 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-yellow-300 flex items-center gap-1">
-          <Star size={12} />
-          {profile.dominance.label}
+        {placementText && (
+          <span className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold ${placementClass}`}>
+            {placementText}
+          </span>
+        )}
+      </div>
+
+      {/* DOMINANCE */}
+      {hasDominance && (
+        <div className="absolute top-[64px] left-4 z-30">
+          <div className="bg-black/70 backdrop-blur px-3 py-1 rounded-full text-xs font-extrabold text-yellow-200 flex items-center gap-1 border border-white/10">
+            <Star size={12} />
+            {dominanceLabel}
+          </div>
         </div>
       )}
 
-      {/* ================= FOTO ================= */}
-      <div className={`relative ${photoHeightClass} p-4`} style={{ transform: "translateZ(30px)" }}>
-        <div className={`relative h-full w-full rounded-3xl overflow-hidden border-2 ${frameClass}`}>
+      {/* PHOTO — 10% MENOR */}
+      <div className={`relative ${photoHeightClass} p-3 z-10`}>
+        <div className={`relative h-full w-full overflow-hidden rounded-[26px] border-2 ${frameInner}`}>
           {photoToUse ? (
             <img src={photoToUse} alt={athleteName} className="w-full h-full object-cover" />
           ) : (
-            <div className="w-full h-full bg-gray-300 flex items-center justify-center text-gray-600">
+            <div className="w-full h-full bg-white/10 flex items-center justify-center text-white/70">
               Sem foto
             </div>
           )}
 
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
 
-          <div className="absolute bottom-4 left-4 right-4 text-white text-xl font-extrabold">
+          <div className="absolute bottom-3 left-3 right-3 text-white text-lg font-extrabold drop-shadow">
             {athleteName}
           </div>
 
-          <div className="absolute top-4 right-4 flex gap-2">
-            <label className="bg-black/70 border border-white/20 rounded-full p-2 cursor-pointer hover:bg-black">
-              <ImagePlus size={18} className="text-white" />
+          <div className="absolute top-3 right-3 flex gap-2">
+            <label className="bg-black/65 border border-white/15 rounded-full p-2 cursor-pointer hover:bg-black/80">
+              <ImagePlus size={16} className="text-white" />
               <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
             </label>
 
             {customPhoto && (
               <button
                 onClick={() => setCustomPhoto(null)}
-                className="bg-black/70 border border-white/20 rounded-full p-2 hover:bg-black"
+                className="bg-black/65 border border-white/15 rounded-full p-2 hover:bg-black/80"
               >
-                <RotateCcw size={18} className="text-white" />
+                <RotateCcw size={16} className="text-white" />
               </button>
             )}
           </div>
         </div>
       </div>
 
-      {/* ================= CONTEÚDO ================= */}
-      <div
-        className={`relative flex flex-col justify-between ${containerPadding}`}
-        style={{ transform: "translateZ(18px)" }}
-      >
-        <div className={`absolute inset-4 rounded-3xl border-2 ${frameClass}/40`} />
+      {/* CONTENT */}
+      <div className={`relative z-10 ${containerPadding} flex flex-col justify-between`}>
+        <div className="absolute inset-4 rounded-[26px] bg-black/10 border border-white/10" />
 
         <div className="relative z-10 text-center space-y-3">
           <div className="flex justify-center">
-            <div className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg ${iconBg}`}>
-              <Trophy className="text-black" size={28} />
+            <div
+              className={`w-14 h-14 rounded-full flex items-center justify-center ring-2 ${medalRing} ${medalBg}`}
+            >
+              <Trophy className="text-black" size={26} />
             </div>
           </div>
 
-          <div className={`${accentText} text-sm font-bold uppercase tracking-widest`}>
+          <div className={`${accentText} text-sm font-extrabold uppercase tracking-[0.24em]`}>
             {achievement}
           </div>
 
-          <div className="text-gray-900 text-xl font-extrabold px-2">
+          <div className="text-white text-[20px] font-extrabold leading-tight px-3 drop-shadow">
             {title}
           </div>
 
-          <div className="text-gray-600 text-sm font-semibold">
+          <div className="text-white/80 text-sm font-semibold">
             {category && <span>{category} • </span>}
             {year}
           </div>
 
-          <div className="bg-white/90 rounded-xl px-4 py-2 border font-bold">
+          <div className="mx-auto w-fit bg-white/10 rounded-2xl px-5 py-2 border border-white/10 text-white font-extrabold">
             {club}
           </div>
+
+          {profile?.rarity && (
+            <div className="text-[10px] font-extrabold tracking-[0.35em] text-white/60">
+              {String(profile.rarity).toUpperCase()}
+            </div>
+          )}
         </div>
 
-        <div className="text-center text-[11px] font-semibold text-gray-500">
+        <div className="relative z-10 text-center text-[11px] font-semibold text-white/60">
           {brandText}
         </div>
       </div>
