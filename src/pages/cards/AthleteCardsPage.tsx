@@ -57,6 +57,51 @@ function getYear(a: any): number {
 }
 
 /* =========================
+   HELPER: EXTRAIR DIVISÃO (apenas se não for "Divisão Única")
+========================== */
+function getDivision(a: any): string | null {
+  const division = 
+    a?.division || 
+    a?.divisionName || 
+    a?.level || 
+    "";
+  
+  const divisionStr = String(division).trim().toLowerCase();
+  
+  // Se for "divisão única" ou vazio, retorna null (não mostra)
+  if (!divisionStr || 
+      divisionStr.includes("divisão única") || 
+      divisionStr.includes("divisao unica") ||
+      divisionStr.includes("unica") ||
+      divisionStr === "única") {
+    return null;
+  }
+  
+  return safeText(division);
+}
+
+/* =========================
+   HELPER: EXTRAIR CATEGORIA
+========================== */
+function getCategory(a: any): string | null {
+  const category = 
+    a?.category || 
+    a?.categoryName ||
+    a?.ageGroup ||
+    a?.categoryLevel ||
+    "";
+  
+  const categoryStr = String(category).trim();
+  
+  // Se vazio, retorna null
+  if (!categoryStr) {
+    return null;
+  }
+  
+  return categoryStr;
+}
+
+/* =========================
    PLACEMENT
 ========================== */
 function getPlacement(a: AchievementVM | null): PlacementType {
@@ -149,30 +194,42 @@ function shouldShowAchievement(placement: PlacementType): boolean {
 }
 
 /* =========================
-   COMPONENTE: MINI ACHIEVEMENT CARD (NOVO LAYOUT)
+   COMPONENTE: MINI ACHIEVEMENT CARD (ADAPTATIVO)
 ========================== */
 function CompactAchievementCard({
   active,
   title,
   year,
+  division,
+  category,
   placement,
   onClick,
 }: {
   active: boolean;
   title: string;
   year: number;
+  division: string | null;
+  category: string | null;
   placement: PlacementType;
   onClick: () => void;
 }) {
   const emoji = placementEmoji(placement);
   const label = placementLabel(placement, title);
+  
+  // Calcula altura dinamicamente baseado no que tem para mostrar
+  const hasCategory = category !== null;
+  const hasDivision = division !== null;
+  
+  let height = 90; // Base: título + ano + colocação
+  if (hasDivision) height += 20;
+  if (hasCategory) height += 20;
 
   return (
     <button
       onClick={onClick}
       className={`
         relative group
-        w-[140px] h-[110px]
+        w-[140px]
         flex-shrink-0
         p-3 rounded-lg border-2
         transition-all duration-200 ease-out
@@ -182,29 +239,44 @@ function CompactAchievementCard({
             : "bg-slate-800/50 border-slate-700/60 hover:bg-slate-800/70 hover:border-slate-600"
         }
       `}
+      style={{ height: `${height}px` }}
     >
       {/* Conteúdo */}
       <div className="h-full flex flex-col justify-between">
-        {/* Nome do campeonato */}
+        {/* Nome do campeonato + Ano */}
         <h4
           className={`
             font-bold text-[11px] leading-tight line-clamp-2 text-left
             ${active ? "text-white" : "text-gray-200"}
           `}
-          title={title}
+          title={`${title} - ${year}`}
         >
-          {title}
+          {title} - {year}
         </h4>
 
-        {/* Ano */}
-        <div
-          className={`
-            text-[10px] font-semibold text-left
-            ${active ? "text-white/90" : "text-gray-300"}
-          `}
-        >
-          {year || "—"}
-        </div>
+        {/* Divisão (apenas se existir e não for "Divisão Única") */}
+        {hasDivision && (
+          <div
+            className={`
+              text-[9px] font-medium text-left truncate
+              ${active ? "text-white/80" : "text-gray-400"}
+            `}
+          >
+            {division}
+          </div>
+        )}
+
+        {/* Categoria (apenas se existir) */}
+        {hasCategory && (
+          <div
+            className={`
+              text-[10px] font-semibold text-left truncate
+              ${active ? "text-white/90" : "text-gray-300"}
+            `}
+          >
+            {category}
+          </div>
+        )}
 
         {/* Colocação/Conquista com emoji inline */}
         <div
@@ -543,7 +615,7 @@ export default function AthleteCardsPage() {
                   <div
                     ref={scrollRef}
                     className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-hide"
-                    style={{ maxHeight: "120px" }}
+                    style={{ maxHeight: "140px" }}
                   >
                     {achievements.map((a, i) => {
                       const title = safeText(
@@ -551,6 +623,8 @@ export default function AthleteCardsPage() {
                         "Conquista"
                       );
                       const year = getYear(a);
+                      const division = getDivision(a);
+                      const category = getCategory(a);
                       const p = getPlacement(a);
 
                       return (
@@ -559,6 +633,8 @@ export default function AthleteCardsPage() {
                             active={i === selectedAchievementIndex}
                             title={title}
                             year={year}
+                            division={division}
+                            category={category}
                             placement={p}
                             onClick={() => setSelectedAchievementIndex(i)}
                           />
@@ -582,15 +658,13 @@ export default function AthleteCardsPage() {
           </div>
         )}
 
-        {/* ==================== CARD + AÇÕES (AGORA ESCALANDO JUNTOS) ==================== */}
+        {/* ==================== CARD + AÇÕES ==================== */}
         <div className="flex flex-col items-center py-4">
-          {/* Container que escala Card + Botões juntos */}
           <div
             className="scale-[0.5] sm:scale-[0.6] md:scale-[0.7] lg:scale-[0.75] origin-top"
             style={{ animation: "vhFadeUp 300ms ease-out" }}
           >
             <div className="flex flex-col items-center gap-4">
-              {/* Card */}
               <div ref={cardRef} key={cardKey} className="will-change-transform">
                 {cardType === "presentation" ? (
                   presentationFormat === "feed" ? (
@@ -651,7 +725,6 @@ export default function AthleteCardsPage() {
                 )}
               </div>
 
-              {/* Ações - agora dentro do scale junto com o card */}
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <button
                   onClick={handleExport}
