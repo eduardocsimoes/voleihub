@@ -38,6 +38,31 @@ type PresentationFormat = "feed" | "story";
 type CardType = "presentation" | "achievement";
 
 /* =========================
+   HELPER: EXTRAIR CLUBE ATUAL (múltiplas fontes)
+========================== */
+function getCurrentClub(profile: any): string | null {
+  // Opção 1: Campo direto no profile
+  if (profile?.currentClub) return profile.currentClub;
+  if (profile?.club) return profile.club;
+  if (profile?.clubName) return profile.clubName;
+  
+  // Opção 2: Experiência marcada como atual
+  if (Array.isArray(profile?.experiences)) {
+    const currentExp = profile.experiences.find((exp: any) => exp.current === true);
+    if (currentExp?.clubName) return currentExp.clubName; // ✅ clubName, não club
+    if (currentExp?.club) return currentExp.club;
+    
+    // Opção 3: Primeira experiência (mais recente)
+    if (profile.experiences.length > 0) {
+      const latest = profile.experiences[0];
+      return latest?.clubName || latest?.club || null; // ✅ clubName primeiro
+    }
+  }
+  
+  return null;
+}
+
+/* =========================
    HELPERS
 ========================== */
 function safeText(value: any, fallback = "—"): string {
@@ -84,7 +109,9 @@ function getDivision(a: any): string | null {
    HELPER: EXTRAIR CATEGORIA
 ========================== */
 function getCategory(a: any): string | null {
+  // Prioriza championshipCategory (campo principal do sistema)
   const category = 
+    a?.championshipCategory ||
     a?.category || 
     a?.categoryName ||
     a?.ageGroup ||
@@ -93,7 +120,6 @@ function getCategory(a: any): string | null {
   
   const categoryStr = String(category).trim();
   
-  // Se vazio, retorna null
   if (!categoryStr) {
     return null;
   }
@@ -194,7 +220,7 @@ function shouldShowAchievement(placement: PlacementType): boolean {
 }
 
 /* =========================
-   COMPONENTE: MINI ACHIEVEMENT CARD (ADAPTATIVO)
+   COMPONENTE: MINI ACHIEVEMENT CARD (ALTURA FIXA RESPONSIVA)
 ========================== */
 function CompactAchievementCard({
   active,
@@ -215,21 +241,13 @@ function CompactAchievementCard({
 }) {
   const emoji = placementEmoji(placement);
   const label = placementLabel(placement, title);
-  
-  // Calcula altura dinamicamente baseado no que tem para mostrar
-  const hasCategory = category !== null;
-  const hasDivision = division !== null;
-  
-  let height = 90; // Base: título + ano + colocação
-  if (hasDivision) height += 20;
-  if (hasCategory) height += 20;
 
   return (
     <button
       onClick={onClick}
       className={`
         relative group
-        w-[140px]
+        w-[140px] h-[130px]
         flex-shrink-0
         p-3 rounded-lg border-2
         transition-all duration-200 ease-out
@@ -239,7 +257,6 @@ function CompactAchievementCard({
             : "bg-slate-800/50 border-slate-700/60 hover:bg-slate-800/70 hover:border-slate-600"
         }
       `}
-      style={{ height: `${height}px` }}
     >
       {/* Conteúdo */}
       <div className="h-full flex flex-col justify-between">
@@ -254,29 +271,25 @@ function CompactAchievementCard({
           {title} - {year}
         </h4>
 
-        {/* Divisão (apenas se existir e não for "Divisão Única") */}
-        {hasDivision && (
-          <div
-            className={`
-              text-[9px] font-medium text-left truncate
-              ${active ? "text-white/80" : "text-gray-400"}
-            `}
-          >
-            {division}
-          </div>
-        )}
+        {/* Categoria (sempre com espaço reservado) */}
+        <div
+          className={`
+            text-[10px] font-semibold text-left truncate h-[14px]
+            ${active ? "text-white/90" : "text-gray-300"}
+          `}
+        >
+          {category || "\u00A0"}
+        </div>
 
-        {/* Categoria (apenas se existir) */}
-        {hasCategory && (
-          <div
-            className={`
-              text-[10px] font-semibold text-left truncate
-              ${active ? "text-white/90" : "text-gray-300"}
-            `}
-          >
-            {category}
-          </div>
-        )}
+        {/* Divisão (sempre com espaço reservado) */}
+        <div
+          className={`
+            text-[9px] font-medium text-left truncate h-[12px]
+            ${active ? "text-white/80" : "text-gray-400"}
+          `}
+        >
+          {division || "\u00A0"}
+        </div>
 
         {/* Colocação/Conquista com emoji inline */}
         <div
@@ -615,7 +628,6 @@ export default function AthleteCardsPage() {
                   <div
                     ref={scrollRef}
                     className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-hide"
-                    style={{ maxHeight: "140px" }}
                   >
                     {achievements.map((a, i) => {
                       const title = safeText(
@@ -673,8 +685,8 @@ export default function AthleteCardsPage() {
                       profilePhotoUrl={profile.photoURL}
                       position={profile.position}
                       heightCm={profile.height}
-                      birthYear={profile.birthDate}
-                      club={profile.club}
+                      birthYear={profile.birthDate ? new Date(profile.birthDate).getFullYear() : null}
+                      club={getCurrentClub(profile)}
                       city={profile.city}
                       state={profile.state}
                       mainTitle={profile.achievements?.[0]?.championship || null}
@@ -685,8 +697,8 @@ export default function AthleteCardsPage() {
                       profilePhotoUrl={profile.photoURL}
                       position={profile.position}
                       heightCm={profile.height}
-                      birthYear={profile.birthDate}
-                      club={profile.club}
+                      birthYear={profile.birthDate ? new Date(profile.birthDate).getFullYear() : null}
+                      club={getCurrentClub(profile)}
                       city={profile.city}
                       state={profile.state}
                       mainTitle={profile.achievements?.[0]?.championship || null}
@@ -696,13 +708,13 @@ export default function AthleteCardsPage() {
                   <AthleteAchievementFeedCard
                     athleteName={profile.name}
                     profilePhotoUrl={profile.photoURL}
-                    title={safeText(selectedAchievement?.title)}
-                    achievement={safeText(selectedAchievement?.achievement)}
-                    category={safeText(selectedAchievement?.category)}
+                    title={safeText((selectedAchievement as any)?.championship)}
+                    achievement={safeText((selectedAchievement as any)?.placement)}
+                    category={safeText((selectedAchievement as any)?.championshipCategory)}
                     year={Number(
                       selectedAchievement?.year || new Date().getFullYear()
                     )}
-                    club={safeText(selectedAchievement?.club)}
+                    club={safeText((selectedAchievement as any)?.club)}
                     profile={achievementProfile ?? undefined}
                     ui={achievementUI}
                     brandText="voleihub.com"
@@ -711,13 +723,13 @@ export default function AthleteCardsPage() {
                   <AthleteAchievementStoryCard
                     athleteName={profile.name}
                     profilePhotoUrl={profile.photoURL}
-                    title={safeText(selectedAchievement?.title)}
-                    achievement={safeText(selectedAchievement?.achievement)}
-                    category={safeText(selectedAchievement?.category)}
+                    title={safeText((selectedAchievement as any)?.championship)}
+                    achievement={safeText((selectedAchievement as any)?.placement)}
+                    category={safeText((selectedAchievement as any)?.championshipCategory)}
                     year={Number(
                       selectedAchievement?.year || new Date().getFullYear()
                     )}
-                    club={safeText(selectedAchievement?.club)}
+                    club={safeText((selectedAchievement as any)?.club)}
                     profile={achievementProfile ?? undefined}
                     ui={achievementUI}
                     brandText="voleihub.com"
