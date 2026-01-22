@@ -3,10 +3,20 @@ import { auth } from "../../firebase/config";
 import { getUserProfile } from "../../firebase/firestore";
 import { uploadAthleteCardImage } from "../../firebase/storage";
 
+import {
+  buildAchievementCardProfile,
+  type AchievementVM,
+} from "./achievementCardProfile";
+
+import {
+  buildAchievementCardUI,
+  type PlacementType,
+} from "./design/achievementCardVisuals";
+
 import AthletePresentationStoryCard from "../cards/AthletePresentationStoryCard";
 import AthletePresentationFeedCard from "../cards/AthletePresentationFeedCard";
-import PremiumAchievementCard from "./components/premium/PremiumAchievementCard";
-import CardRevealAnimation from "./components/CardRevealAnimation";
+import AthleteAchievementFeedCard from "../cards/AthleteAchievementFeedCard";
+import AthleteAchievementStoryCard from "../cards/AthleteAchievementStoryCard";
 
 import { toPng } from "html-to-image";
 import {
@@ -19,7 +29,6 @@ import {
   Smartphone,
   ChevronLeft,
   ChevronRight,
-  Sparkles,
 } from "lucide-react";
 
 /* =========================
@@ -32,18 +41,21 @@ type CardType = "presentation" | "achievement";
    HELPER: EXTRAIR CLUBE ATUAL (múltiplas fontes)
 ========================== */
 function getCurrentClub(profile: any): string | null {
+  // Opção 1: Campo direto no profile
   if (profile?.currentClub) return profile.currentClub;
   if (profile?.club) return profile.club;
   if (profile?.clubName) return profile.clubName;
   
+  // Opção 2: Experiência marcada como atual
   if (Array.isArray(profile?.experiences)) {
     const currentExp = profile.experiences.find((exp: any) => exp.current === true);
-    if (currentExp?.clubName) return currentExp.clubName;
+    if (currentExp?.clubName) return currentExp.clubName; // ✅ clubName, não club
     if (currentExp?.club) return currentExp.club;
     
+    // Opção 3: Primeira experiência (mais recente)
     if (profile.experiences.length > 0) {
       const latest = profile.experiences[0];
-      return latest?.clubName || latest?.club || null;
+      return latest?.clubName || latest?.club || null; // ✅ clubName primeiro
     }
   }
   
@@ -81,6 +93,7 @@ function getDivision(a: any): string | null {
   
   const divisionStr = String(division).trim().toLowerCase();
   
+  // Se for "divisão única" ou vazio, retorna null (não mostra)
   if (!divisionStr || 
       divisionStr.includes("divisão única") || 
       divisionStr.includes("divisao unica") ||
@@ -96,6 +109,7 @@ function getDivision(a: any): string | null {
    HELPER: EXTRAIR CATEGORIA
 ========================== */
 function getCategory(a: any): string | null {
+  // Prioriza championshipCategory (campo principal do sistema)
   const category = 
     a?.championshipCategory ||
     a?.category || 
@@ -114,11 +128,9 @@ function getCategory(a: any): string | null {
 }
 
 /* =========================
-   PLACEMENT TYPE (para compatibilidade)
+   PLACEMENT
 ========================== */
-type PlacementType = "gold" | "silver" | "bronze" | "mvp" | "position" | "none";
-
-function getPlacement(a: any): PlacementType {
+function getPlacement(a: AchievementVM | null): PlacementType {
   if (!a) return "none";
 
   const placementField = String((a as any)?.placement ?? "").toLowerCase();
@@ -165,6 +177,7 @@ function placementLabel(p: PlacementType, title: string) {
     case "mvp":
       return "MVP";
     case "position":
+      // Tenta extrair do título (ex: "Melhor Ponteira")
       if (title.toLowerCase().includes("melhor")) {
         return title;
       }
@@ -174,33 +187,36 @@ function placementLabel(p: PlacementType, title: string) {
   }
 }
 
+function getAchievementKindLabel(a: any): "Coletivo" | "Individual" | "—" {
+  const raw =
+    String(
+      a?.kind ??
+        a?.typeKind ??
+        a?.achievementKind ??
+        a?.formatKind ??
+        a?.mode ??
+        a?.format ??
+        a?.isIndividual ??
+        ""
+    ).toLowerCase();
+
+  if (raw === "true") return "Individual";
+  if (raw === "false") return "Coletivo";
+  if (raw.includes("ind")) return "Individual";
+  if (raw.includes("solo")) return "Individual";
+  if (raw.includes("colet")) return "Coletivo";
+  if (raw.includes("team")) return "Coletivo";
+  if (raw === "individual") return "Individual";
+  if (raw === "coletivo") return "Coletivo";
+
+  return "—";
+}
+
 /* =========================
    FILTRO: Apenas medalhas e conquistas individuais
 ========================== */
 function shouldShowAchievement(placement: PlacementType): boolean {
   return ["gold", "silver", "bronze", "mvp", "position"].includes(placement);
-}
-
-/* =========================
-   HELPER: DETERMINAR RARIDADE DO CARD
-========================== */
-function getCardRarity(achievement: any): "common" | "rare" | "epic" | "legendary" {
-  if (!achievement) return "common";
-  
-  const placement = getPlacement(achievement);
-  const title = String(achievement?.title || "").toLowerCase();
-  
-  if (placement === "gold" || title.includes("campeão") || title.includes("campeao")) {
-    return "legendary";
-  }
-  if (placement === "silver" || placement === "mvp") {
-    return "epic";
-  }
-  if (placement === "bronze" || placement === "position") {
-    return "rare";
-  }
-  
-  return "common";
 }
 
 /* =========================
@@ -242,7 +258,9 @@ function CompactAchievementCard({
         }
       `}
     >
+      {/* Conteúdo */}
       <div className="h-full flex flex-col justify-between">
+        {/* Nome do campeonato + Ano */}
         <h4
           className={`
             font-bold text-[11px] leading-tight line-clamp-2 text-left
@@ -253,6 +271,7 @@ function CompactAchievementCard({
           {title} - {year}
         </h4>
 
+        {/* Categoria (sempre com espaço reservado) */}
         <div
           className={`
             text-[10px] font-semibold text-left truncate h-[14px]
@@ -262,6 +281,7 @@ function CompactAchievementCard({
           {category || "\u00A0"}
         </div>
 
+        {/* Divisão (sempre com espaço reservado) */}
         <div
           className={`
             text-[9px] font-medium text-left truncate h-[12px]
@@ -271,6 +291,7 @@ function CompactAchievementCard({
           {division || "\u00A0"}
         </div>
 
+        {/* Colocação/Conquista com emoji inline */}
         <div
           className={`
             flex items-center gap-1 text-[11px] font-bold
@@ -282,6 +303,7 @@ function CompactAchievementCard({
         </div>
       </div>
 
+      {/* Pulso de seleção */}
       {active && (
         <div className="absolute inset-0 rounded-lg border border-white/30 pointer-events-none animate-pulse"></div>
       )}
@@ -302,10 +324,6 @@ export default function AthleteCardsPage() {
 
   const [exporting, setExporting] = useState(false);
   const [selectedAchievementIndex, setSelectedAchievementIndex] = useState(0);
-
-  // Estados para animação de reveal
-  const [showReveal, setShowReveal] = useState(false);
-  const [revealCompleted, setRevealCompleted] = useState(true);
 
   const cardRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -387,28 +405,48 @@ export default function AthleteCardsPage() {
   /* =========================
      DATA
   ========================== */
-  const allAchievements = useMemo(() => {
+  const allAchievements = useMemo<AchievementVM[]>(() => {
     return Array.isArray(profile?.achievements) ? profile.achievements : [];
   }, [profile]);
 
+  // FILTRAR: apenas medalhas e conquistas individuais
   const filteredAchievements = useMemo(() => {
-    return allAchievements.filter((a: any) => {
+    return allAchievements.filter((a) => {
       const placement = getPlacement(a);
       return shouldShowAchievement(placement);
     });
   }, [allAchievements]);
 
+  // ORDENAR: decrescente por ano (mais recente primeiro)
   const sortedAchievements = useMemo(() => {
-    return [...filteredAchievements].sort((a: any, b: any) => {
+    return [...filteredAchievements].sort((a, b) => {
       const yearA = getYear(a);
       const yearB = getYear(b);
-      return yearB - yearA;
+      return yearB - yearA; // Decrescente
     });
   }, [filteredAchievements]);
 
   const achievements = sortedAchievements;
 
   const selectedAchievement = achievements[selectedAchievementIndex] ?? null;
+
+  const achievementProfile = useMemo(() => {
+    if (!selectedAchievement) return null;
+    return buildAchievementCardProfile({
+      achievement: selectedAchievement,
+      allAchievements: allAchievements, // Usa todos para cálculo de perfil
+    });
+  }, [selectedAchievement, allAchievements]);
+
+  const placement = useMemo(
+    () => getPlacement(selectedAchievement),
+    [selectedAchievement]
+  );
+
+  const achievementUI = useMemo(() => {
+    if (!achievementProfile) return undefined;
+    return buildAchievementCardUI({ profile: achievementProfile, placement });
+  }, [achievementProfile, placement]);
 
   /* =========================
      STATES
@@ -434,55 +472,9 @@ export default function AthleteCardsPage() {
   ========================== */
   const cardKey = `${cardType}-${presentationFormat}-${selectedAchievementIndex}`;
 
-  // Componente do card
-  const CardComponent = (
-    <div ref={cardRef} key={cardKey} className="will-change-transform">
-      {cardType === "presentation" ? (
-        presentationFormat === "feed" ? (
-          <AthletePresentationFeedCard
-            name={profile.name}
-            profilePhotoUrl={profile.photoURL}
-            position={profile.position}
-            heightCm={profile.height}
-            birthYear={profile.birthDate ? new Date(profile.birthDate).getFullYear() : null}
-            club={getCurrentClub(profile)}
-            city={profile.city}
-            state={profile.state}
-            mainTitle={profile.achievements?.[0]?.championship || null}
-          />
-        ) : (
-          <AthletePresentationStoryCard
-            name={profile.name}
-            profilePhotoUrl={profile.photoURL}
-            position={profile.position}
-            heightCm={profile.height}
-            birthYear={profile.birthDate ? new Date(profile.birthDate).getFullYear() : null}
-            club={getCurrentClub(profile)}
-            city={profile.city}
-            state={profile.state}
-            mainTitle={profile.achievements?.[0]?.championship || null}
-          />
-        )
-      ) : (
-        <PremiumAchievementCard
-          athleteName={profile.name}
-          profilePhotoUrl={profile.photoURL}
-          position={profile.position}
-          championship={safeText((selectedAchievement as any)?.championship)}
-          championshipCategory={safeText((selectedAchievement as any)?.championshipCategory)}
-          year={Number(selectedAchievement?.year || new Date().getFullYear())}
-          club={safeText((selectedAchievement as any)?.club)}
-          achievement={selectedAchievement}
-          allAchievements={allAchievements}
-          format={presentationFormat}
-          brandText="voleihub.com"
-        />
-      )}
-    </div>
-  );
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+      {/* Keyframes */}
       <style>{`
         @keyframes vhFadeUp {
           0% { opacity: 0; transform: translateY(12px) scale(0.98); }
@@ -509,6 +501,7 @@ export default function AthleteCardsPage() {
         {/* ==================== FAIXA 1: TIPO + FORMATO ==================== */}
         <div className="w-full">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 p-4 bg-slate-900/60 backdrop-blur-sm rounded-xl border border-slate-700/50">
+            {/* Tipo de Card */}
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:block">
                 Tipo:
@@ -547,8 +540,10 @@ export default function AthleteCardsPage() {
               </div>
             </div>
 
+            {/* Divisor */}
             <div className="hidden sm:block h-8 w-px bg-slate-700"></div>
 
+            {/* Formato */}
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider hidden sm:block">
                 Formato:
@@ -593,6 +588,7 @@ export default function AthleteCardsPage() {
         {cardType === "achievement" && (
           <div className="w-full">
             <div className="bg-slate-900/40 backdrop-blur-sm rounded-xl border border-slate-700/50 p-3">
+              {/* Header compacto */}
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-[11px] font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                   <Trophy size={12} className="text-orange-500" />
@@ -604,8 +600,10 @@ export default function AthleteCardsPage() {
                 </span>
               </div>
 
+              {/* Carrossel */}
               {achievements.length > 0 ? (
                 <div className="relative group">
+                  {/* Botões de navegação */}
                   {achievements.length > 5 && (
                     <>
                       <button
@@ -626,11 +624,12 @@ export default function AthleteCardsPage() {
                     </>
                   )}
 
+                  {/* Container do carrossel */}
                   <div
                     ref={scrollRef}
                     className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-hide"
                   >
-                    {achievements.map((a: any, i: number) => {
+                    {achievements.map((a, i) => {
                       const title = safeText(
                         a?.title || (a as any)?.championship,
                         "Conquista"
@@ -678,34 +677,67 @@ export default function AthleteCardsPage() {
             style={{ animation: "vhFadeUp 300ms ease-out" }}
           >
             <div className="flex flex-col items-center gap-4">
-              {/* Card com animação de reveal */}
-              {showReveal && !revealCompleted ? (
-                <CardRevealAnimation
-                  onRevealComplete={() => setRevealCompleted(true)}
-                  autoPlay={true}
-                  rarity={getCardRarity(selectedAchievement)}
-                >
-                  {CardComponent}
-                </CardRevealAnimation>
-              ) : (
-                CardComponent
-              )}
+              <div ref={cardRef} key={cardKey} className="will-change-transform">
+                {cardType === "presentation" ? (
+                  presentationFormat === "feed" ? (
+                    <AthletePresentationFeedCard
+                      name={profile.name}
+                      profilePhotoUrl={profile.photoURL}
+                      position={profile.position}
+                      heightCm={profile.height}
+                      birthYear={profile.birthDate ? new Date(profile.birthDate).getFullYear() : null}
+                      club={getCurrentClub(profile)}
+                      city={profile.city}
+                      state={profile.state}
+                      mainTitle={profile.achievements?.[0]?.championship || null}
+                    />
+                  ) : (
+                    <AthletePresentationStoryCard
+                      name={profile.name}
+                      profilePhotoUrl={profile.photoURL}
+                      position={profile.position}
+                      heightCm={profile.height}
+                      birthYear={profile.birthDate ? new Date(profile.birthDate).getFullYear() : null}
+                      club={getCurrentClub(profile)}
+                      city={profile.city}
+                      state={profile.state}
+                      mainTitle={profile.achievements?.[0]?.championship || null}
+                    />
+                  )
+                ) : presentationFormat === "feed" ? (
+                  <AthleteAchievementFeedCard
+                    athleteName={profile.name}
+                    profilePhotoUrl={profile.photoURL}
+                    title={safeText((selectedAchievement as any)?.championship)}
+                    achievement={safeText((selectedAchievement as any)?.placement)}
+                    category={safeText((selectedAchievement as any)?.championshipCategory)}
+                    year={Number(
+                      selectedAchievement?.year || new Date().getFullYear()
+                    )}
+                    club={safeText((selectedAchievement as any)?.club)}
+                    profile={achievementProfile ?? undefined}
+                    ui={achievementUI}
+                    brandText="voleihub.com"
+                  />
+                ) : (
+                  <AthleteAchievementStoryCard
+                    athleteName={profile.name}
+                    profilePhotoUrl={profile.photoURL}
+                    title={safeText((selectedAchievement as any)?.championship)}
+                    achievement={safeText((selectedAchievement as any)?.placement)}
+                    category={safeText((selectedAchievement as any)?.championshipCategory)}
+                    year={Number(
+                      selectedAchievement?.year || new Date().getFullYear()
+                    )}
+                    club={safeText((selectedAchievement as any)?.club)}
+                    profile={achievementProfile ?? undefined}
+                    ui={achievementUI}
+                    brandText="voleihub.com"
+                  />
+                )}
+              </div>
 
               <div className="flex flex-wrap items-center justify-center gap-3">
-                {/* Botão de Reveal - só aparece para cards de conquista */}
-                {cardType === "achievement" && selectedAchievement && (
-                  <button
-                    onClick={() => {
-                      setShowReveal(true);
-                      setRevealCompleted(false);
-                    }}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-sm rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
-                  >
-                    <Sparkles size={16} />
-                    <span>Revelar Card 🎉</span>
-                  </button>
-                )}
-
                 <button
                   onClick={handleExport}
                   disabled={exporting}
